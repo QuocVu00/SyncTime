@@ -1,4 +1,17 @@
-package com.example.synctime.data.local.migration
+package com.example.app.data.migration
 
-object Migration1To2 {
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+val MIGRATION_1_2 = object : Migration(1, 2) {
+
+    override fun migrate(database: SupportSQLiteDatabase) {
+
+        database.execSQL(
+            """
+            ALTER TABLE users
+            ADD COLUMN phone TEXT
+            """.trimIndent()
+        )
+    }
 }
