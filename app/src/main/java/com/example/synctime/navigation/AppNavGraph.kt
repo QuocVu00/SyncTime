@@ -20,6 +20,7 @@ import androidx.navigation.compose.composable
 import com.example.synctime.ui.admin.AdminDashboardScreen
 import com.example.synctime.ui.admin.BranchListScreen
 import com.example.synctime.ui.admin.SalaryReportScreen
+import com.example.synctime.ui.admin.SalarySettingScreen
 import com.example.synctime.ui.manager.BranchAttendanceScreen
 import com.example.synctime.ui.manager.ManagerDashboardScreen
 import com.example.synctime.ui.manager.RequestApprovalScreen
@@ -38,6 +39,8 @@ fun AppNavGraph(
         composable("role_select") {
             RoleSelectScreen(navController)
         }
+
+        // ================= MANAGER =================
 
         composable("manager_dashboard") {
             ManagerDashboardScreen(navController)
@@ -64,12 +67,21 @@ fun AppNavGraph(
             )
         }
 
+        // ================= ADMIN =================
+
         composable("admin_dashboard") {
             AdminDashboardScreen(navController)
         }
 
         composable("branch_list") {
             BranchListScreen(
+                navController = navController,
+                viewModel = viewModel
+            )
+        }
+
+        composable("salary_setting") {
+            SalarySettingScreen(
                 navController = navController,
                 viewModel = viewModel
             )
