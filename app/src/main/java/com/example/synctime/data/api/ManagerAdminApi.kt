@@ -6,6 +6,7 @@ import com.example.synctime.data.model.BranchDto
 import com.example.synctime.data.model.BranchRequest
 import com.example.synctime.data.model.CreateMultiScheduleRequest
 import com.example.synctime.data.model.CreateScheduleRequest
+import com.example.synctime.data.model.CreateStaffRequest
 import com.example.synctime.data.model.PositionSalaryDto
 import com.example.synctime.data.model.RequestDto
 import com.example.synctime.data.model.SalaryDto
@@ -24,6 +25,16 @@ interface ManagerAdminApi {
 
     @GET("api/manager/staff")
     suspend fun getManagerStaff(): Response<List<StaffDto>>
+
+    /*
+        API mới: Manager tạo nhân viên.
+        Backend cần có API:
+        POST /api/manager/staff
+    */
+    @POST("api/manager/staff")
+    suspend fun createStaff(
+        @Body body: CreateStaffRequest
+    ): Response<ApiMessage>
 
     @GET("api/manager/requests")
     suspend fun getRequests(): Response<List<RequestDto>>
@@ -65,6 +76,11 @@ interface ManagerAdminApi {
     @GET("api/admin/branches")
     suspend fun getBranches(): Response<List<BranchDto>>
 
+    /*
+        API Admin tạo chi nhánh mới.
+        Backend cần có API:
+        POST /api/admin/branches
+    */
     @POST("api/admin/branches")
     suspend fun createBranch(
         @Body body: BranchRequest

@@ -21,8 +21,19 @@ fun AdminDashboardScreen(navController: NavController) {
         Spacer(modifier = Modifier.height(16.dp))
 
         MenuActionCard(
+            title = "Tạo chi nhánh mới",
+            description = "Thêm chi nhánh mới và nhập BSSID Wi-Fi để chấm công",
+            tag = "New",
+            onClick = {
+                navController.navigate("create_branch")
+            }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        MenuActionCard(
             title = "Quản lý chi nhánh / BSSID",
-            description = "Cập nhật Wi-Fi hợp lệ cho từng chi nhánh",
+            description = "Xem danh sách chi nhánh và cập nhật BSSID Wi-Fi",
             tag = "BSSID",
             onClick = {
                 navController.navigate("branch_list")

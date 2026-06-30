@@ -58,10 +58,19 @@ fun BranchListScreen(
 
         AppHeader(
             title = "Quản lý chi nhánh / BSSID",
-            subtitle = "Cập nhật Wi-Fi hợp lệ để nhân viên chấm công đúng chi nhánh"
+            subtitle = "Tạo chi nhánh mới và cập nhật Wi-Fi hợp lệ"
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        PrimaryButton(
+            text = "Tạo chi nhánh mới",
+            onClick = {
+                navController.navigate("create_branch")
+            }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         AppCard {
             Text(
@@ -183,8 +192,10 @@ private fun BranchCard(
 
 private fun getBranchMessageType(message: String): BadgeType {
     return when {
+        message.contains("Đã tạo", ignoreCase = true) -> BadgeType.SUCCESS
         message.contains("Đã cập nhật", ignoreCase = true) -> BadgeType.SUCCESS
         message.contains("không được", ignoreCase = true) -> BadgeType.ERROR
+        message.contains("Vui lòng", ignoreCase = true) -> BadgeType.WARNING
         message.contains("thất bại", ignoreCase = true) -> BadgeType.ERROR
         message.contains("lỗi", ignoreCase = true) -> BadgeType.ERROR
         message.contains("Không tải", ignoreCase = true) -> BadgeType.ERROR

@@ -8,6 +8,7 @@ import com.example.synctime.data.model.BranchDto
 import com.example.synctime.data.model.BranchRequest
 import com.example.synctime.data.model.CreateMultiScheduleRequest
 import com.example.synctime.data.model.CreateScheduleRequest
+import com.example.synctime.data.model.CreateStaffRequest
 import com.example.synctime.data.model.PositionSalaryDto
 import com.example.synctime.data.model.PositionType
 import com.example.synctime.data.model.RequestDto
@@ -198,6 +199,7 @@ class ManagerAdminViewModel(
         viewModelScope.launch {
             try {
                 val response = api.getManagerStaff()
+
                 if (response.isSuccessful) {
                     _staffList.value = response.body() ?: emptyList()
                     _message.value = ""
@@ -249,6 +251,7 @@ class ManagerAdminViewModel(
                     status = "APPROVED"
                 )
             )
+
             _message.value = "Đang dùng dữ liệu mẫu"
             return
         }
@@ -256,6 +259,7 @@ class ManagerAdminViewModel(
         viewModelScope.launch {
             try {
                 val response = api.getRequests()
+
                 if (response.isSuccessful) {
                     _requests.value = response.body() ?: emptyList()
                     _message.value = ""
@@ -273,6 +277,7 @@ class ManagerAdminViewModel(
             _requests.value = _requests.value.map {
                 if (it.id == id) it.copy(status = "APPROVED") else it
             }
+
             _message.value = "Đã duyệt đơn"
             return
         }
@@ -280,6 +285,7 @@ class ManagerAdminViewModel(
         viewModelScope.launch {
             try {
                 val response = api.approveRequest(id)
+
                 if (response.isSuccessful) {
                     _message.value = "Đã duyệt đơn"
                     loadRequests()
@@ -297,6 +303,7 @@ class ManagerAdminViewModel(
             _requests.value = _requests.value.map {
                 if (it.id == id) it.copy(status = "REJECTED") else it
             }
+
             _message.value = "Đã từ chối đơn"
             return
         }
@@ -304,6 +311,7 @@ class ManagerAdminViewModel(
         viewModelScope.launch {
             try {
                 val response = api.rejectRequest(id)
+
                 if (response.isSuccessful) {
                     _message.value = "Đã từ chối đơn"
                     loadRequests()
@@ -380,6 +388,7 @@ class ManagerAdminViewModel(
                     totalHours = 9.25
                 )
             )
+
             _message.value = "Đang dùng dữ liệu mẫu"
             return
         }
@@ -387,6 +396,7 @@ class ManagerAdminViewModel(
         viewModelScope.launch {
             try {
                 val response = api.getManagerAttendance()
+
                 if (response.isSuccessful) {
                     _attendance.value = response.body() ?: emptyList()
                     _message.value = ""
@@ -399,15 +409,6 @@ class ManagerAdminViewModel(
         }
     }
 
-    /*
-        Hàm mới: tạo lịch cho nhiều nhân viên.
-        Kiểm tra nghiệp vụ:
-        - Phải chọn ngày
-        - Phải chọn ca
-        - Phải chọn ít nhất 2 nhân viên
-        - Phải có ít nhất 1 Phục vụ
-        - Phải có ít nhất 1 Pha chế
-    */
     fun createScheduleForEmployees(
         workDate: String,
         shift: ShiftOption?,
@@ -463,9 +464,6 @@ class ManagerAdminViewModel(
         }
     }
 
-    /*
-        Hàm cũ giữ lại để màn hình cũ không lỗi.
-    */
     fun createSchedule(userId: String, shiftId: String, workDate: String) {
         if (userId.isBlank() || shiftId.isBlank() || workDate.isBlank()) {
             _message.value = "Vui lòng nhập đủ User ID, Shift ID và ngày làm"
@@ -506,6 +504,79 @@ class ManagerAdminViewModel(
         }
     }
 
+    fun createStaff(
+        fullName: String,
+        email: String,
+        password: String,
+        position: String,
+        branchIdText: String
+    ) {
+        if (fullName.isBlank()) {
+            _message.value = "Vui lòng nhập họ tên nhân viên"
+            return
+        }
+
+        if (email.isBlank()) {
+            _message.value = "Vui lòng nhập email nhân viên"
+            return
+        }
+
+        if (password.isBlank()) {
+            _message.value = "Vui lòng nhập mật khẩu tạm"
+            return
+        }
+
+        if (position.isBlank()) {
+            _message.value = "Vui lòng chọn chức vụ"
+            return
+        }
+
+        val branchId = branchIdText.toIntOrNull()
+
+        if (useMockData) {
+            val positionType = PositionType.fromCode(position)
+
+            val newStaff = StaffDto(
+                id = (_staffList.value.maxOfOrNull { it.id } ?: 0) + 1,
+                fullName = fullName,
+                email = email,
+                role = "STAFF",
+                branchId = branchId,
+                position = positionType.code,
+                positionName = positionType.displayName,
+                branchName = if (branchId != null) "Chi nhánh $branchId" else "Chi nhánh chính"
+            )
+
+            _staffList.value = _staffList.value + newStaff
+            _message.value = "Đã tạo nhân viên mới"
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val body = CreateStaffRequest(
+                    fullName = fullName,
+                    email = email,
+                    password = password,
+                    role = "STAFF",
+                    position = position,
+                    branchId = branchId
+                )
+
+                val response = api.createStaff(body)
+
+                if (response.isSuccessful) {
+                    _message.value = "Tạo nhân viên thành công"
+                    loadStaff()
+                } else {
+                    _message.value = "Tạo nhân viên thất bại"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi: ${e.message}"
+            }
+        }
+    }
+
     // ================= ADMIN =================
 
     fun loadBranches() {
@@ -526,6 +597,7 @@ class ManagerAdminViewModel(
                     rewardRate = 1.0
                 )
             )
+
             _message.value = "Đang dùng dữ liệu mẫu"
             return
         }
@@ -533,6 +605,7 @@ class ManagerAdminViewModel(
         viewModelScope.launch {
             try {
                 val response = api.getBranches()
+
                 if (response.isSuccessful) {
                     _branches.value = response.body() ?: emptyList()
                     _message.value = ""
@@ -541,6 +614,66 @@ class ManagerAdminViewModel(
                 }
             } catch (e: Exception) {
                 _message.value = "Lỗi kết nối server: ${e.message}"
+            }
+        }
+    }
+
+    fun createBranch(
+        name: String,
+        address: String,
+        wifiBssid: String,
+        rewardRateText: String
+    ) {
+        if (name.isBlank()) {
+            _message.value = "Vui lòng nhập tên chi nhánh"
+            return
+        }
+
+        if (address.isBlank()) {
+            _message.value = "Vui lòng nhập địa chỉ chi nhánh"
+            return
+        }
+
+        if (wifiBssid.isBlank()) {
+            _message.value = "Vui lòng nhập BSSID Wi-Fi"
+            return
+        }
+
+        val rewardRate = rewardRateText.toDoubleOrNull() ?: 1.0
+
+        if (useMockData) {
+            val newBranch = BranchDto(
+                id = (_branches.value.maxOfOrNull { it.id } ?: 0) + 1,
+                name = name,
+                address = address,
+                wifiBssid = wifiBssid,
+                rewardRate = rewardRate
+            )
+
+            _branches.value = _branches.value + newBranch
+            _message.value = "Đã tạo chi nhánh mới"
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val body = BranchRequest(
+                    name = name,
+                    address = address,
+                    wifiBssid = wifiBssid,
+                    rewardRate = rewardRate
+                )
+
+                val response = api.createBranch(body)
+
+                if (response.isSuccessful) {
+                    _message.value = "Tạo chi nhánh thành công"
+                    loadBranches()
+                } else {
+                    _message.value = "Tạo chi nhánh thất bại"
+                }
+            } catch (e: Exception) {
+                _message.value = "Lỗi: ${e.message}"
             }
         }
     }
@@ -555,6 +688,7 @@ class ManagerAdminViewModel(
             _branches.value = _branches.value.map {
                 if (it.id == branch.id) it.copy(wifiBssid = newBssid) else it
             }
+
             _message.value = "Đã cập nhật BSSID"
             return
         }
@@ -592,6 +726,7 @@ class ManagerAdminViewModel(
         viewModelScope.launch {
             try {
                 val response = api.getPositionSalaries()
+
                 if (response.isSuccessful) {
                     _positionSalaries.value = response.body() ?: emptyList()
                     _message.value = ""
@@ -620,6 +755,7 @@ class ManagerAdminViewModel(
                     it
                 }
             }
+
             _message.value = "Đã cập nhật lương chức vụ"
             return
         }
@@ -695,6 +831,7 @@ class ManagerAdminViewModel(
                     overtimeMinutes = 30
                 )
             )
+
             _message.value = "Đang dùng dữ liệu mẫu"
             return
         }
@@ -702,6 +839,7 @@ class ManagerAdminViewModel(
         viewModelScope.launch {
             try {
                 val response = api.getSalaryReport()
+
                 if (response.isSuccessful) {
                     _salary.value = response.body() ?: emptyList()
                     _message.value = ""

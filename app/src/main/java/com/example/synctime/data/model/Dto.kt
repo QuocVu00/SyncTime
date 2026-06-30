@@ -184,3 +184,16 @@ data class PositionSalaryDto(
 data class UpdatePositionSalaryRequest(
     val hourlyRate: Double
 )
+
+/*
+    Manager tạo nhân viên mới.
+    Role mặc định nên là STAFF.
+*/
+data class CreateStaffRequest(
+    val fullName: String,
+    val email: String,
+    val password: String,
+    val role: String = "STAFF",
+    val position: String,
+    val branchId: Int?
+)
