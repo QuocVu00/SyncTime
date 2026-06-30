@@ -2,16 +2,11 @@ package com.example.synctime.ui.admin
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,8 +16,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.synctime.data.model.BranchDto
+import com.example.synctime.ui.components.AppCard
+import com.example.synctime.ui.components.AppHeader
+import com.example.synctime.ui.components.AppScreen
+import com.example.synctime.ui.components.AppTextField
+import com.example.synctime.ui.components.BadgeType
+import com.example.synctime.ui.components.PrimaryButton
+import com.example.synctime.ui.components.SectionTitle
+import com.example.synctime.ui.components.StatusBadge
+import com.example.synctime.ui.theme.AppColors
 import com.example.synctime.viewmodel.ManagerAdminViewModel
 
 @Composable
@@ -41,12 +47,7 @@ fun BranchListScreen(
         viewModel.loadBranches()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-
+    AppScreen {
         TextButton(
             onClick = {
                 navController.popBackStack()
@@ -55,64 +56,139 @@ fun BranchListScreen(
             Text("← Quay lại")
         }
 
-        Text(
-            text = "Quản lý chi nhánh / BSSID",
-            style = MaterialTheme.typography.headlineSmall
+        AppHeader(
+            title = "Quản lý chi nhánh / BSSID",
+            subtitle = "Cập nhật Wi-Fi hợp lệ để nhân viên chấm công đúng chi nhánh"
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        AppCard {
+            Text(
+                text = "Lưu ý",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.TextPrimary
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Nhân viên chỉ chấm công hợp lệ khi thiết bị đang kết nối đúng Wi-Fi/BSSID của chi nhánh.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = AppColors.TextSecondary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         if (message.isNotBlank()) {
-            Text(text = message)
-            Spacer(modifier = Modifier.height(8.dp))
+            StatusBadge(
+                text = message,
+                type = getBranchMessageType(message)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
         }
+
+        SectionTitle(
+            title = "Danh sách chi nhánh",
+            subtitle = "Admin có thể sửa BSSID khi Wi-Fi công ty thay đổi"
+        )
 
         LazyColumn {
             items(branches) { branch ->
-
                 val currentText = bssidInputs[branch.id] ?: branch.wifiBssid
 
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text("Mã chi nhánh: ${branch.id}")
-                        Text("Tên chi nhánh: ${branch.name}")
-                        Text("Địa chỉ: ${branch.address}")
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = currentText,
-                            onValueChange = {
-                                bssidInputs[branch.id] = it
-                            },
-                            label = {
-                                Text("BSSID Wi-Fi")
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                BranchCard(
+                    branch = branch,
+                    bssidValue = currentText,
+                    onBssidChange = { newValue ->
+                        bssidInputs[branch.id] = newValue
+                    },
+                    onUpdateClick = {
+                        viewModel.updateBranchBssid(
+                            branch = branch,
+                            newBssid = currentText
                         )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Button(
-                            onClick = {
-                                viewModel.updateBranchBssid(
-                                    branch = branch,
-                                    newBssid = currentText
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Cập nhật BSSID")
-                        }
                     }
-                }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun BranchCard(
+    branch: BranchDto,
+    bssidValue: String,
+    onBssidChange: (String) -> Unit,
+    onUpdateClick: () -> Unit
+) {
+    AppCard {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = branch.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.TextPrimary
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = branch.address,
+                style = MaterialTheme.typography.bodyMedium,
+                color = AppColors.TextSecondary
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            StatusBadge(
+                text = "BSSID hiện tại",
+                type = BadgeType.INFO
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = branch.wifiBssid,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.TextPrimary
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            AppTextField(
+                value = bssidValue,
+                onValueChange = onBssidChange,
+                label = "BSSID Wi-Fi mới",
+                placeholder = "Ví dụ: A1:B2:C3:D4:E5:F6"
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            PrimaryButton(
+                text = "Cập nhật BSSID",
+                onClick = onUpdateClick
+            )
+        }
+    }
+}
+
+private fun getBranchMessageType(message: String): BadgeType {
+    return when {
+        message.contains("Đã cập nhật", ignoreCase = true) -> BadgeType.SUCCESS
+        message.contains("không được", ignoreCase = true) -> BadgeType.ERROR
+        message.contains("thất bại", ignoreCase = true) -> BadgeType.ERROR
+        message.contains("lỗi", ignoreCase = true) -> BadgeType.ERROR
+        message.contains("Không tải", ignoreCase = true) -> BadgeType.ERROR
+        message.contains("Đang dùng", ignoreCase = true) -> BadgeType.INFO
+        else -> BadgeType.INFO
     }
 }
