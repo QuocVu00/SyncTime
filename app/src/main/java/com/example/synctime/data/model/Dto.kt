@@ -60,3 +60,10 @@ data class CreateScheduleRequest(
     val shiftId: Int,
     val workDate: String
 )
+
+//Thông báo trả về
+data class ApiResponse<T>(
+    val success: Boolean,
+    val message: String,
+    val data: T? = null
+)

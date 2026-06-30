@@ -1,6 +1,7 @@
 package com.example.synctime.data.api
 
 import com.example.synctime.data.model.ApiMessage
+import com.example.synctime.data.model.ApiResponse
 import com.example.synctime.data.model.AttendanceDto
 import com.example.synctime.data.model.BranchDto
 import com.example.synctime.data.model.BranchRequest
@@ -20,7 +21,7 @@ interface ManagerAdminApi {
     // ================= MANAGER =================
 
     @GET("api/manager/staff")
-    suspend fun getManagerStaff(): Response<List<StaffDto>>
+    suspend fun getManagerStaff(): Response<ApiResponse<List<StaffDto>>>
 
     @GET("api/manager/requests")
     suspend fun getRequests(): Response<List<RequestDto>>
