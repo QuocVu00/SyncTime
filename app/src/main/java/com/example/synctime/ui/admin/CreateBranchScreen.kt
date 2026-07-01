@@ -45,7 +45,6 @@ fun CreateBranchScreen(
 
         AppHeader(
             title = "Tạo chi nhánh mới",
-            subtitle = "Admin thêm chi nhánh và BSSID Wi-Fi dùng để chấm công"
         )
 
         Spacer(modifier = Modifier.height(16.dp))

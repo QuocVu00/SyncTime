@@ -58,7 +58,6 @@ fun BranchListScreen(
 
         AppHeader(
             title = "Quản lý chi nhánh / BSSID",
-            subtitle = "Tạo chi nhánh mới và cập nhật Wi-Fi hợp lệ"
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -71,23 +70,6 @@ fun BranchListScreen(
         )
 
         Spacer(modifier = Modifier.height(12.dp))
-
-        AppCard {
-            Text(
-                text = "Lưu ý",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = AppColors.TextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Nhân viên chỉ chấm công hợp lệ khi thiết bị đang kết nối đúng Wi-Fi/BSSID của chi nhánh.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = AppColors.TextSecondary
-            )
-        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -102,7 +84,6 @@ fun BranchListScreen(
 
         SectionTitle(
             title = "Danh sách chi nhánh",
-            subtitle = "Admin có thể sửa BSSID khi Wi-Fi công ty thay đổi"
         )
 
         LazyColumn {

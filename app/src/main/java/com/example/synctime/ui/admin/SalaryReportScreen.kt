@@ -56,7 +56,6 @@ fun SalaryReportScreen(
 
         AppHeader(
             title = "Bảng lương nhân viên",
-            subtitle = "Tính theo chức vụ và tổng giờ làm thực tế"
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -68,39 +67,6 @@ fun SalaryReportScreen(
         )
 
         Spacer(modifier = Modifier.height(12.dp))
-
-        AppCard {
-            Text(
-                text = "Quy định tính lương",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = AppColors.TextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Lương = tổng giờ làm thực tế × lương theo giờ của chức vụ.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = AppColors.TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Tăng ca vẫn tính như giờ làm bình thường, không nhân hệ số 1.5.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = AppColors.TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Riêng Bếp không tính trễ/tăng ca, chỉ ghi nhận giờ vào và giờ ra.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = AppColors.TextSecondary
-            )
-        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -115,7 +81,6 @@ fun SalaryReportScreen(
 
         SectionTitle(
             title = "Danh sách lương",
-            subtitle = "Hiển thị theo từng nhân viên"
         )
 
         LazyColumn {

@@ -57,7 +57,6 @@ fun BranchAttendanceScreen(
 
         AppHeader(
             title = "Lịch sử chấm công",
-            subtitle = "Theo dõi giờ vào, giờ ra, trễ và tăng ca"
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -101,7 +100,6 @@ fun BranchAttendanceScreen(
 
         SectionTitle(
             title = "Danh sách chấm công",
-            subtitle = "Bếp chỉ ghi nhận giờ vào/ra, không tính trễ hoặc tăng ca"
         )
 
         LazyColumn {

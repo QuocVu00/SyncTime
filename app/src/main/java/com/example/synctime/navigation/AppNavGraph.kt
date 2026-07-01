@@ -20,6 +20,7 @@ import com.example.synctime.ui.components.BadgeType
 import com.example.synctime.ui.components.MenuActionCard
 import com.example.synctime.ui.components.StatusBadge
 import com.example.synctime.ui.manager.BranchAttendanceScreen
+import com.example.synctime.ui.manager.CreateStaffScreen
 import com.example.synctime.ui.manager.ManagerDashboardScreen
 import com.example.synctime.ui.manager.RequestApprovalScreen
 import com.example.synctime.ui.manager.ScheduleManagementScreen
@@ -42,6 +43,13 @@ fun AppNavGraph(
 
         composable("manager_dashboard") {
             ManagerDashboardScreen(navController)
+        }
+
+        composable("create_staff") {
+            CreateStaffScreen(
+                navController = navController,
+                viewModel = viewModel
+            )
         }
 
         composable("request_approval") {
@@ -132,7 +140,7 @@ fun RoleSelectScreen(navController: NavHostController) {
 
         MenuActionCard(
             title = "Vào màn hình Manager",
-            description = "Tạo lịch làm, duyệt đơn và xem lịch sử chấm công",
+            description = "Tạo nhân viên, tạo lịch làm, duyệt đơn và xem lịch sử chấm công",
             tag = "Manager",
             onClick = {
                 navController.navigate("manager_dashboard")

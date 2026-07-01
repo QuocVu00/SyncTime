@@ -59,43 +59,9 @@ fun SalarySettingScreen(
 
         AppHeader(
             title = "Cài đặt lương chức vụ",
-            subtitle = "Admin chỉnh mức lương theo giờ cho từng chức vụ"
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        AppCard {
-            Text(
-                text = "Quy định tính lương",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = AppColors.TextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Lương = tổng giờ làm thực tế × lương theo giờ của chức vụ.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = AppColors.TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Tăng ca vẫn tính theo lương giờ bình thường, không nhân hệ số 1.5.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = AppColors.TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Riêng Bếp không tính trễ hoặc tăng ca, chỉ ghi nhận giờ vào/ra thực tế.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = AppColors.TextSecondary
-            )
-        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
