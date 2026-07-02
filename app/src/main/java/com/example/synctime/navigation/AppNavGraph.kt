@@ -8,23 +8,35 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+
 import com.example.synctime.ui.admin.AdminDashboardScreen
 import com.example.synctime.ui.admin.BranchListScreen
 import com.example.synctime.ui.admin.CreateBranchScreen
 import com.example.synctime.ui.admin.SalaryReportScreen
 import com.example.synctime.ui.admin.SalarySettingScreen
+
 import com.example.synctime.ui.components.AppCard
 import com.example.synctime.ui.components.AppHeader
 import com.example.synctime.ui.components.AppScreen
 import com.example.synctime.ui.components.BadgeType
 import com.example.synctime.ui.components.MenuActionCard
 import com.example.synctime.ui.components.StatusBadge
+
 import com.example.synctime.ui.manager.BranchAttendanceScreen
 import com.example.synctime.ui.manager.CreateStaffScreen
 import com.example.synctime.ui.manager.ManagerDashboardScreen
 import com.example.synctime.ui.manager.RequestApprovalScreen
 import com.example.synctime.ui.manager.ScheduleManagementScreen
+
 import com.example.synctime.viewmodel.ManagerAdminViewModel
+
+// ===== IMPORT PHẦN 3 STAFF / LOGIN =====
+import com.example.synctime.ui.auth.LoginScreen
+import com.example.synctime.ui.staff.StaffHomeScreen
+import com.example.synctime.ui.staff.AttendanceScreen
+import com.example.synctime.ui.staff.MyScheduleScreen
+import com.example.synctime.ui.staff.CreateRequestScreen
+import com.example.synctime.ui.staff.RequestHistoryScreen
 
 @Composable
 fun AppNavGraph(
@@ -33,10 +45,43 @@ fun AppNavGraph(
 ) {
     NavHost(
         navController = navController,
-        startDestination = "role_select"
+
+        // Khi ghép chính thức thì nên để login
+        // Nếu muốn test Manager/Admin tạm thời thì đổi lại thành "role_select"
+        startDestination = "login"
     ) {
+
+        // ================= LOGIN =================
+
+        composable("login") {
+            LoginScreen(navController)
+        }
+
+        // Màn hình test tạm, có thể giữ lại để demo riêng phần 4
         composable("role_select") {
             RoleSelectScreen(navController)
+        }
+
+        // ================= STAFF =================
+
+        composable("staff_home") {
+            StaffHomeScreen(navController)
+        }
+
+        composable("attendance") {
+            AttendanceScreen(navController)
+        }
+
+        composable("my_schedule") {
+            MyScheduleScreen(navController)
+        }
+
+        composable("create_request") {
+            CreateRequestScreen(navController)
+        }
+
+        composable("request_history") {
+            RequestHistoryScreen(navController)
         }
 
         // ================= MANAGER =================
@@ -59,15 +104,15 @@ fun AppNavGraph(
             )
         }
 
-        composable("branch_attendance") {
-            BranchAttendanceScreen(
+        composable("schedule_management") {
+            ScheduleManagementScreen(
                 navController = navController,
                 viewModel = viewModel
             )
         }
 
-        composable("schedule_management") {
-            ScheduleManagementScreen(
+        composable("branch_attendance") {
+            BranchAttendanceScreen(
                 navController = navController,
                 viewModel = viewModel
             )
@@ -137,6 +182,17 @@ fun RoleSelectScreen(navController: NavHostController) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        MenuActionCard(
+            title = "Vào màn hình Staff",
+            description = "Chấm công, xem lịch làm, tạo đơn và xem lịch sử đơn",
+            tag = "Staff",
+            onClick = {
+                navController.navigate("staff_home")
+            }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         MenuActionCard(
             title = "Vào màn hình Manager",
