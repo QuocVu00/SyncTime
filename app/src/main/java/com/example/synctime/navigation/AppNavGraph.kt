@@ -31,12 +31,14 @@ import com.example.synctime.ui.manager.ScheduleManagementScreen
 import com.example.synctime.viewmodel.ManagerAdminViewModel
 
 // ===== IMPORT PHẦN 3 STAFF / LOGIN =====
-//import com.example.synctime.ui.auth.LoginScreen
-//import com.example.synctime.ui.staff.StaffHomeScreen
-//import com.example.synctime.ui.staff.AttendanceScreen
-//import com.example.synctime.ui.staff.MyScheduleScreen
-//import com.example.synctime.ui.staff.CreateRequestScreen
-//import com.example.synctime.ui.staff.RequestHistoryScreen
+// Tạm thời comment vì project hiện tại chưa có LoginScreen / StaffHomeScreen dạng Compose
+// Khi ghép chính thức thì mở lại các import này và khai báo route tương ứng
+// import com.example.synctime.ui.auth.LoginScreen
+// import com.example.synctime.ui.staff.StaffHomeScreen
+// import com.example.synctime.ui.staff.AttendanceScreen
+// import com.example.synctime.ui.staff.MyScheduleScreen
+// import com.example.synctime.ui.staff.CreateRequestScreen
+// import com.example.synctime.ui.staff.RequestHistoryScreen
 
 @Composable
 fun AppNavGraph(
@@ -46,43 +48,79 @@ fun AppNavGraph(
     NavHost(
         navController = navController,
 
-        // Khi ghép chính thức thì nên để login
-        // Nếu muốn test Manager/Admin tạm thời thì đổi lại thành "role_select"
-        startDestination = "login"
+        /*
+            TẠM THỜI ĐỂ TEST APP:
+            - Dùng "role_select" để app mở lên không bị crash.
+            - Lý do: route "login" chưa được khai báo vì LoginScreen đang bị comment.
+
+            KHI GHÉP CHÍNH THỨC:
+            - Tạo hoặc mở lại LoginScreen.
+            - Thêm composable("login") bên dưới.
+            - Sau đó đổi lại:
+              startDestination = "login"
+        */
+        startDestination = "role_select"
     ) {
 
         // ================= LOGIN =================
 
-//        composable("login") {
-//            LoginScreen(navController)
-//        }
+        /*
+        KHI CÓ LoginScreen HOÀN CHỈNH THÌ MỞ LẠI ĐOẠN NÀY:
 
-        // Màn hình test tạm, có thể giữ lại để demo riêng phần 4
+        composable("login") {
+            LoginScreen(navController)
+        }
+        */
+
+        // Màn hình chọn role tạm thời để test phần Manager/Admin
         composable("role_select") {
             RoleSelectScreen(navController)
         }
 
         // ================= STAFF =================
 
-//        composable("staff_home") {
-//            StaffHomeScreen(navController)
-//        }
-//
-//        composable("attendance") {
-//            AttendanceScreen(navController)
-//        }
-//
-//        composable("my_schedule") {
-//            MyScheduleScreen(navController)
-//        }
-//
-//        composable("create_request") {
-//            CreateRequestScreen(navController)
-//        }
-//
-//        composable("request_history") {
-//            RequestHistoryScreen(navController)
-//        }
+        /*
+            PHẦN STAFF HIỆN TẠI:
+            - Code của Khoa đã được thêm vào project.
+            - Nhưng code đó đang là Activity XML:
+              CreateRequestActivity.kt
+              MyScheduleActivity.kt
+              ViewRequestsActivity.kt
+
+            Project hiện tại lại đang dùng Compose Navigation.
+            Vì vậy chưa thể navigate("staff_home") nếu chưa có route staff_home.
+
+            KHI GHÉP CHÍNH THỨC CÓ 2 CÁCH:
+
+            Cách 1:
+            - Chuyển các màn staff sang Compose.
+            - Sau đó mở lại các route dưới đây.
+
+            composable("staff_home") {
+                StaffHomeScreen(navController)
+            }
+
+            composable("attendance") {
+                AttendanceScreen(navController)
+            }
+
+            composable("my_schedule") {
+                MyScheduleScreen(navController)
+            }
+
+            composable("create_request") {
+                CreateRequestScreen(navController)
+            }
+
+            composable("request_history") {
+                RequestHistoryScreen(navController)
+            }
+
+            Cách 2:
+            - Giữ Activity XML của Khoa.
+            - Khai báo Activity trong AndroidManifest.xml.
+            - Mở màn staff bằng Intent thay vì navController.navigate().
+        */
 
         // ================= MANAGER =================
 
@@ -185,10 +223,22 @@ fun RoleSelectScreen(navController: NavHostController) {
 
         MenuActionCard(
             title = "Vào màn hình Staff",
-            description = "Chấm công, xem lịch làm, tạo đơn và xem lịch sử đơn",
+            description = "Phần Staff của Khoa đã thêm vào project nhưng chưa gắn vào Compose Navigation.",
             tag = "Staff",
             onClick = {
-                navController.navigate("staff_home")
+                /*
+                    TẠM THỜI ĐỂ TRỐNG ĐỂ APP KHÔNG CRASH.
+
+                    Lý do:
+                    - Trước đó gọi navController.navigate("staff_home")
+                    - Nhưng route "staff_home" chưa được khai báo trong NavHost
+                    - Nên bấm vào sẽ crash giống lỗi:
+                      navigation destination staff_home is not a direct child of this NavGraph
+
+                    Khi ghép chính thức:
+                    - Tạo StaffHomeScreen dạng Compose rồi thêm composable("staff_home")
+                    - Hoặc mở Activity staff của Khoa bằng Intent
+                */
             }
         )
 
