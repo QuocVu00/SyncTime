@@ -1,4 +1,4 @@
-package com.example.baitaplon
+package com.example.synctime
 
 import org.junit.Test
 

@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.baitaplon"
+    namespace = "com.example.synctime"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.baitaplon"
+        applicationId = "com.example.synctime"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

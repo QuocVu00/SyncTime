@@ -1,4 +1,4 @@
-package com.example.baitaplon
+package com.example.synctime
 
 import android.Manifest
 import android.content.Intent
@@ -13,15 +13,15 @@ import androidx.core.app.ActivityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.example.baitaplon.utils.DeviceInfoProvider
-import com.example.baitaplon.utils.PreferenceManager
-import com.example.baitaplon.utils.WifiInfoProvider
-import com.example.baitaplon.api.ApiService
-import com.example.baitaplon.api.CheckInRequest
-import com.example.baitaplon.api.CheckInResponse
-import com.example.baitaplon.api.CheckOutRequest
-import com.example.baitaplon.api.CheckOutResponse
-import com.example.baitaplon.api.AttendanceStatusResponse
+import com.example.synctime.utils.DeviceInfoProvider
+import com.example.synctime.utils.PreferenceManager
+import com.example.synctime.utils.WifiInfoProvider
+import com.example.synctime.api.ApiService
+import com.example.synctime.api.CheckInRequest
+import com.example.synctime.api.CheckInResponse
+import com.example.synctime.api.CheckOutRequest
+import com.example.synctime.api.CheckOutResponse
+import com.example.synctime.api.AttendanceStatusResponse
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response

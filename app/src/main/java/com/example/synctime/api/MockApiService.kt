@@ -1,4 +1,4 @@
-package com.example.baitaplon.api
+package com.example.synctime.api
 
 import retrofit2.Call
 import retrofit2.Response

@@ -1,4 +1,4 @@
-package com.example.baitaplon.utils
+package com.example.synctime.utils
 
 import android.Manifest
 import android.content.Context

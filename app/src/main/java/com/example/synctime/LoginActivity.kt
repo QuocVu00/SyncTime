@@ -1,4 +1,4 @@
-package com.example.baitaplon
+package com.example.synctime
 
 import android.content.Intent
 import android.os.Bundle
@@ -6,10 +6,10 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.baitaplon.api.ApiService
-import com.example.baitaplon.api.LoginRequest
-import com.example.baitaplon.api.LoginResponse
-import com.example.baitaplon.utils.PreferenceManager
+import com.example.synctime.api.ApiService
+import com.example.synctime.api.LoginRequest
+import com.example.synctime.api.LoginResponse
+import com.example.synctime.utils.PreferenceManager
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response

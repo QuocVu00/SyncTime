@@ -1,4 +1,4 @@
-package com.example.baitaplon
+package com.example.synctime
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -12,10 +12,10 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.example.baitaplon.api.ApiService
-import com.example.baitaplon.api.StaffRequestItem
-import com.example.baitaplon.api.StaffRequestsResponse
-import com.example.baitaplon.utils.DeviceInfoProvider
+import com.example.synctime.api.ApiService
+import com.example.synctime.api.StaffRequestItem
+import com.example.synctime.api.StaffRequestsResponse
+import com.example.synctime.utils.DeviceInfoProvider
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
