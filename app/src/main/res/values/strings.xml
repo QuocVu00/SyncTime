@@ -1,3 +1,64 @@
 <resources>
     <string name="app_name">SyncTime</string>
-</resources>
+        <!-- Login Screen -->
+        <string name="login_title">Đăng nhập</string>
+        <string name="username_hint">Tên đăng nhập</string>
+        <string name="password_hint">Mật khẩu</string>
+        <string name="login_button">Đăng nhập</string>
+        <string name="login_success">Đăng nhập thành công</string>
+        <string name="login_failed">Đăng nhập thất bại: %1$s</string>
+        <string name="login_empty_fields">Vui lòng nhập đầy đủ thông tin</string>
+        <string name="logging_in">Đang đăng nhập...</string>
+        <string name="connection_error">Lỗi kết nối: %1$s</string>
+
+        <!-- Main Screen -->
+        <string name="android_id_label">Android ID: %1$s</string>
+        <string name="bssid_label">BSSID: %1$s</string>
+        <string name="status_label">Trạng thái: %1$s</string>
+        <string name="status_loading">Đang tải...</string>
+        <string name="status_not_started">Chưa bắt đầu ca làm</string>
+        <string name="status_in_progress">Đang làm việc (Vào lúc: %1$s)</string>
+        <string name="status_finished">Đã ra ca (Vào: %1$s - Ra: %2$s)</string>
+        <string name="status_error">Không thể lấy dữ liệu</string>
+        <string name="status_connection_error">Lỗi kết nối</string>
+
+        <string name="btn_refresh_info">Lấy thông tin thiết bị</string>
+        <string name="btn_check_in">Vào ca</string>
+        <string name="btn_check_out">Ra ca</string>
+        <string name="btn_view_schedule">Xem lịch làm việc</string>
+
+        <string name="check_in_success">Vào ca thành công!</string>
+        <string name="check_in_failed">Vào ca thất bại: %1$s</string>
+        <string name="check_out_success">Ra ca thành công!</string>
+        <string name="check_out_failed">Ra ca thất bại: %1$s</string>
+        <string name="wifi_error">Không thể lấy BSSID. Vui lòng bật WiFi và GPS.</string>
+        <string name="permission_denied">Cần quyền truy cập vị trí để lấy BSSID</string>
+
+        <!-- Schedule Screen -->
+        <string name="schedule_header">Lịch làm việc của tôi</string>
+        <string name="schedule_date">Ngày: %1$s</string>
+        <string name="schedule_shift">Ca: %1$s</string>
+        <string name="schedule_time">Thời gian: %1$s - %2$s</string>
+        <string name="schedule_note">Ghi chú: %1$s</string>
+        <string name="no_note">Không có</string>
+        <string name="schedule_load_error">Không thể tải lịch làm việc</string>
+
+        <!-- Create Request Screen -->
+        <string name="request_header">Tạo đơn mới</string>
+        <string name="request_type_label">Loại đơn:</string>
+        <string name="request_type_leave">Xin nghỉ</string>
+        <string name="request_type_change">Đổi ca</string>
+        <string name="request_date_hint">Ngày (DD/MM/YYYY)</string>
+        <string name="request_reason_hint">Lý do cụ thể</string>
+        <string name="btn_submit_request">Gửi đơn</string>
+        <string name="request_empty_fields">Vui lòng điền đầy đủ thông tin</string>
+        <string name="request_success">Gửi đơn thành công!</string>
+        <string name="request_failed">Gửi đơn thất bại: %1$s</string>
+        <string name="btn_create_request">Tạo đơn xin nghỉ/đổi ca</string>
+
+        <!-- View Requests Screen -->
+        <string name="view_requests_header">Danh sách đơn đã gửi</string>
+        <string name="request_status_label">Trạng thái: %1$s</string>
+        <string name="requests_load_error">Không thể tải danh sách đơn</string>
+        <string name="btn_view_requests">Xem trạng thái đơn</string>
+    </resources>

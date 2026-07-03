@@ -44,7 +44,9 @@ android {
 }
 
 dependencies {
-
+    implementation("com.squareup.retrofit2:retrofit-mock:2.9.0")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
     // Android cơ bản
     implementation("androidx.core:core-ktx:1.13.1")
     implementation(libs.androidx.appcompat)
