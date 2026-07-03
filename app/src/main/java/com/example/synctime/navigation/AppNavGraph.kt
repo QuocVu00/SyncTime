@@ -31,12 +31,12 @@ import com.example.synctime.ui.manager.ScheduleManagementScreen
 import com.example.synctime.viewmodel.ManagerAdminViewModel
 
 // ===== IMPORT PHẦN 3 STAFF / LOGIN =====
-import com.example.synctime.ui.auth.LoginScreen
-import com.example.synctime.ui.staff.StaffHomeScreen
-import com.example.synctime.ui.staff.AttendanceScreen
-import com.example.synctime.ui.staff.MyScheduleScreen
-import com.example.synctime.ui.staff.CreateRequestScreen
-import com.example.synctime.ui.staff.RequestHistoryScreen
+//import com.example.synctime.ui.auth.LoginScreen
+//import com.example.synctime.ui.staff.StaffHomeScreen
+//import com.example.synctime.ui.staff.AttendanceScreen
+//import com.example.synctime.ui.staff.MyScheduleScreen
+//import com.example.synctime.ui.staff.CreateRequestScreen
+//import com.example.synctime.ui.staff.RequestHistoryScreen
 
 @Composable
 fun AppNavGraph(
@@ -53,9 +53,9 @@ fun AppNavGraph(
 
         // ================= LOGIN =================
 
-        composable("login") {
-            LoginScreen(navController)
-        }
+//        composable("login") {
+//            LoginScreen(navController)
+//        }
 
         // Màn hình test tạm, có thể giữ lại để demo riêng phần 4
         composable("role_select") {
@@ -64,25 +64,25 @@ fun AppNavGraph(
 
         // ================= STAFF =================
 
-        composable("staff_home") {
-            StaffHomeScreen(navController)
-        }
-
-        composable("attendance") {
-            AttendanceScreen(navController)
-        }
-
-        composable("my_schedule") {
-            MyScheduleScreen(navController)
-        }
-
-        composable("create_request") {
-            CreateRequestScreen(navController)
-        }
-
-        composable("request_history") {
-            RequestHistoryScreen(navController)
-        }
+//        composable("staff_home") {
+//            StaffHomeScreen(navController)
+//        }
+//
+//        composable("attendance") {
+//            AttendanceScreen(navController)
+//        }
+//
+//        composable("my_schedule") {
+//            MyScheduleScreen(navController)
+//        }
+//
+//        composable("create_request") {
+//            CreateRequestScreen(navController)
+//        }
+//
+//        composable("request_history") {
+//            RequestHistoryScreen(navController)
+//        }
 
         // ================= MANAGER =================
 
