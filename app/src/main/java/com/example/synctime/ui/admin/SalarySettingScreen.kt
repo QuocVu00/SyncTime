@@ -19,32 +19,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.synctime.data.model.BranchDto
+import com.example.synctime.data.model.PositionSalaryDto
 import com.example.synctime.ui.components.AppCard
 import com.example.synctime.ui.components.AppHeader
 import com.example.synctime.ui.components.AppScreen
 import com.example.synctime.ui.components.AppTextField
 import com.example.synctime.ui.components.BadgeType
 import com.example.synctime.ui.components.PrimaryButton
-import com.example.synctime.ui.components.SectionTitle
 import com.example.synctime.ui.components.StatusBadge
 import com.example.synctime.ui.theme.AppColors
 import com.example.synctime.viewmodel.ManagerAdminViewModel
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
-fun BranchListScreen(
+fun SalarySettingScreen(
     navController: NavController,
     viewModel: ManagerAdminViewModel
 ) {
-    val branches by viewModel.branches.collectAsState()
+    val positionSalaries by viewModel.positionSalaries.collectAsState()
     val message by viewModel.message.collectAsState()
 
-    val bssidInputs = remember {
-        mutableStateMapOf<Int, String>()
+    val salaryInputs = remember {
+        mutableStateMapOf<String, String>()
     }
 
     LaunchedEffect(Unit) {
-        viewModel.loadBranches()
+        viewModel.loadPositionSalaries()
     }
 
     AppScreen {
@@ -57,49 +58,37 @@ fun BranchListScreen(
         }
 
         AppHeader(
-            title = "Quản lý chi nhánh / BSSID",
+            title = "Cài đặt lương chức vụ",
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        PrimaryButton(
-            text = "Tạo chi nhánh mới",
-            onClick = {
-                navController.navigate("create_branch")
-            }
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
 
         Spacer(modifier = Modifier.height(12.dp))
 
         if (message.isNotBlank()) {
             StatusBadge(
                 text = message,
-                type = getBranchMessageType(message)
+                type = getSalaryMessageType(message)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        SectionTitle(
-            title = "Danh sách chi nhánh",
-        )
-
         LazyColumn {
-            items(branches) { branch ->
-                val currentText = bssidInputs[branch.id] ?: branch.wifiBssid
+            items(positionSalaries) { item ->
+                val currentInput = salaryInputs[item.position]
+                    ?: item.hourlyRate.toInt().toString()
 
-                BranchCard(
-                    branch = branch,
-                    bssidValue = currentText,
-                    onBssidChange = { newValue ->
-                        bssidInputs[branch.id] = newValue
+                SalaryPositionCard(
+                    item = item,
+                    inputValue = currentInput,
+                    onInputChange = { newValue ->
+                        salaryInputs[item.position] = newValue
                     },
                     onUpdateClick = {
-                        viewModel.updateBranchBssid(
-                            branch = branch,
-                            newBssid = currentText
+                        viewModel.updatePositionSalary(
+                            position = item.position,
+                            newRateText = currentInput
                         )
                     }
                 )
@@ -111,18 +100,20 @@ fun BranchListScreen(
 }
 
 @Composable
-private fun BranchCard(
-    branch: BranchDto,
-    bssidValue: String,
-    onBssidChange: (String) -> Unit,
+private fun SalaryPositionCard(
+    item: PositionSalaryDto,
+    inputValue: String,
+    onInputChange: (String) -> Unit,
     onUpdateClick: () -> Unit
 ) {
+    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("vi", "VN"))
+
     AppCard {
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = branch.name,
+                text = item.positionName,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = AppColors.TextPrimary
@@ -131,56 +122,47 @@ private fun BranchCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = branch.address,
-                style = MaterialTheme.typography.bodyMedium,
+                text = "Mã chức vụ: ${item.position}",
+                style = MaterialTheme.typography.bodySmall,
                 color = AppColors.TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            StatusBadge(
-                text = "BSSID hiện tại",
-                type = BadgeType.INFO
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = branch.wifiBssid,
+                text = "Lương hiện tại: ${currencyFormat.format(item.hourlyRate)}/giờ",
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
                 color = AppColors.TextPrimary
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             AppTextField(
-                value = bssidValue,
-                onValueChange = onBssidChange,
-                label = "BSSID Wi-Fi mới",
-                placeholder = "Ví dụ: A1:B2:C3:D4:E5:F6"
+                value = inputValue,
+                onValueChange = { value ->
+                    val onlyNumber = value.filter { it.isDigit() }
+                    onInputChange(onlyNumber)
+                },
+                label = "Lương mới theo giờ",
+                placeholder = "Ví dụ: 25000"
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             PrimaryButton(
-                text = "Cập nhật BSSID",
+                text = "Cập nhật lương",
                 onClick = onUpdateClick
             )
         }
     }
 }
 
-private fun getBranchMessageType(message: String): BadgeType {
+private fun getSalaryMessageType(message: String): BadgeType {
     return when {
-        message.contains("Đã tạo", ignoreCase = true) -> BadgeType.SUCCESS
         message.contains("Đã cập nhật", ignoreCase = true) -> BadgeType.SUCCESS
-        message.contains("không được", ignoreCase = true) -> BadgeType.ERROR
-        message.contains("Vui lòng", ignoreCase = true) -> BadgeType.WARNING
-        message.contains("thất bại", ignoreCase = true) -> BadgeType.ERROR
+        message.contains("không hợp lệ", ignoreCase = true) -> BadgeType.ERROR
         message.contains("lỗi", ignoreCase = true) -> BadgeType.ERROR
         message.contains("Không tải", ignoreCase = true) -> BadgeType.ERROR
-        message.contains("Đang dùng", ignoreCase = true) -> BadgeType.INFO
         else -> BadgeType.INFO
     }
 }

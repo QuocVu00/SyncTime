@@ -1,16 +1,7 @@
 package com.example.synctime.navigation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -19,8 +10,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.synctime.ui.admin.AdminDashboardScreen
 import com.example.synctime.ui.admin.BranchListScreen
+import com.example.synctime.ui.admin.CreateBranchScreen
 import com.example.synctime.ui.admin.SalaryReportScreen
+import com.example.synctime.ui.admin.SalarySettingScreen
+import com.example.synctime.ui.components.AppCard
+import com.example.synctime.ui.components.AppHeader
+import com.example.synctime.ui.components.AppScreen
+import com.example.synctime.ui.components.BadgeType
+import com.example.synctime.ui.components.MenuActionCard
+import com.example.synctime.ui.components.StatusBadge
 import com.example.synctime.ui.manager.BranchAttendanceScreen
+import com.example.synctime.ui.manager.CreateStaffScreen
 import com.example.synctime.ui.manager.ManagerDashboardScreen
 import com.example.synctime.ui.manager.RequestApprovalScreen
 import com.example.synctime.ui.manager.ScheduleManagementScreen
@@ -39,8 +39,17 @@ fun AppNavGraph(
             RoleSelectScreen(navController)
         }
 
+        // ================= MANAGER =================
+
         composable("manager_dashboard") {
             ManagerDashboardScreen(navController)
+        }
+
+        composable("create_staff") {
+            CreateStaffScreen(
+                navController = navController,
+                viewModel = viewModel
+            )
         }
 
         composable("request_approval") {
@@ -64,12 +73,28 @@ fun AppNavGraph(
             )
         }
 
+        // ================= ADMIN =================
+
         composable("admin_dashboard") {
             AdminDashboardScreen(navController)
         }
 
         composable("branch_list") {
             BranchListScreen(
+                navController = navController,
+                viewModel = viewModel
+            )
+        }
+
+        composable("create_branch") {
+            CreateBranchScreen(
+                navController = navController,
+                viewModel = viewModel
+            )
+        }
+
+        composable("salary_setting") {
+            SalarySettingScreen(
                 navController = navController,
                 viewModel = viewModel
             )
@@ -86,43 +111,51 @@ fun AppNavGraph(
 
 @Composable
 fun RoleSelectScreen(navController: NavHostController) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "SyncTime Demo",
-            style = MaterialTheme.typography.headlineMedium
+    AppScreen {
+        Spacer(modifier = Modifier.height(32.dp))
+
+        AppHeader(
+            title = "SyncTime",
+            subtitle = "Ứng dụng chấm công nhân viên"
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
-            text = "Màn hình tạm để test phần Manager/Admin của thành viên 4"
-        )
+        AppCard {
+            StatusBadge(
+                text = "Modern Young Office",
+                type = BadgeType.INFO
+            )
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        Button(
+            androidx.compose.material3.Text(
+                text = "Màn hình demo tạm thời để kiểm tra phần Manager/Admin. Khi ghép với Login, app sẽ tự điều hướng theo role.",
+                color = com.example.synctime.ui.theme.AppColors.TextSecondary,
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        MenuActionCard(
+            title = "Vào màn hình Manager",
+            description = "Tạo nhân viên, tạo lịch làm, duyệt đơn và xem lịch sử chấm công",
+            tag = "Manager",
             onClick = {
                 navController.navigate("manager_dashboard")
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Vào màn hình Manager")
-        }
+            }
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        OutlinedButton(
+        MenuActionCard(
+            title = "Vào màn hình Admin",
+            description = "Quản lý chi nhánh, BSSID, cài đặt lương và xem bảng lương",
+            tag = "Admin",
             onClick = {
                 navController.navigate("admin_dashboard")
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Vào màn hình Admin")
-        }
+            }
+        )
     }
 }
