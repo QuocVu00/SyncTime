@@ -50,7 +50,7 @@ class RequestRepository(
     /**
      * Chấp nhận yêu cầu (Approve)
      */
-    suspend fun approveRequestRemote(id: Int): Result<String> {
+    suspend fun approveRequestRemote(id: Int): Result<String?> {
         return try {
             val response = managerAdminApi.approveRequest(id)
             if (response.isSuccessful) {
@@ -71,7 +71,7 @@ class RequestRepository(
     /**
      * Từ chối yêu cầu (Reject)
      */
-    suspend fun rejectRequestRemote(id: Int): Result<String> {
+    suspend fun rejectRequestRemote(id: Int): Result<String?> {
         return try {
             val response = managerAdminApi.rejectRequest(id)
             if (response.isSuccessful) {

@@ -34,21 +34,24 @@ data class RequestEntity(
     @ColumnInfo(name = "user_id")
     val userId: Int,
 
-    val type: String,
+    val type: RequestType,
 
     val reason: String,
 
     @ColumnInfo(name = "target_date")
     val targetDate: String,
 
-    val status: String,
+    val status: RequestStatus = RequestStatus.PENDING,
 
     @ColumnInfo(name = "manager_id")
     val managerId: Int?,
 
+    @ColumnInfo(name = "response_note")
+    val responseNote: String?,
+
     @ColumnInfo(name = "created_at")
-    val createdAt: Long,
+    val createdAt: Long = System.currentTimeMillis(),
 
     @ColumnInfo(name = "updated_at")
-    val updatedAt: Long
+    val updatedAt: Long = System.currentTimeMillis()
 )

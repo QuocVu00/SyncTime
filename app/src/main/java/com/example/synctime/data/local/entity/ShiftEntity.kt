@@ -15,5 +15,11 @@ data class ShiftEntity(
     val startTime: String,
 
     @ColumnInfo(name = "end_time")
-    val endTime: String
+    val endTime: String,
+
+    @ColumnInfo(name = "is_active")
+    val isActive: Boolean = true,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long = System.currentTimeMillis()
 )

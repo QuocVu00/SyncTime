@@ -7,36 +7,41 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
 
-    /*
-        Nếu test bằng Android Emulator:
-        Dùng http://10.0.2.2:8080/
-
-        Nếu test bằng điện thoại thật:
-        Đổi thành IP máy tính, ví dụ:
-        http://192.168.1.10:8080/
-    */
     private const val BASE_URL = "http://10.0.2.2:8080/"
 
-    fun create(token: String): ManagerAdminApi {
-        val authInterceptor = Interceptor { chain ->
-            val requestBuilder = chain.request().newBuilder()
-
-            if (token.isNotBlank()) {
-                requestBuilder.addHeader("Authorization", "Bearer $token")
+    private fun getRetrofit(token: String? = null): Retrofit {
+        val clientBuilder = OkHttpClient.Builder()
+        
+        if (!token.isNullOrBlank()) {
+            val authInterceptor = Interceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("Authorization", "Bearer $token")
+                    .build()
+                chain.proceed(request)
             }
-
-            chain.proceed(requestBuilder.build())
+            clientBuilder.addInterceptor(authInterceptor)
         }
-
-        val client = OkHttpClient.Builder()
-            .addInterceptor(authInterceptor)
-            .build()
 
         return Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(client)
+            .client(clientBuilder.build())
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-            .create(ManagerAdminApi::class.java)
     }
+
+    val authApi: AuthApi by lazy {
+        getRetrofit().create(AuthApi::class.java)
+    }
+
+    fun getStaffApi(token: String): StaffApi {
+        return getRetrofit(token).create(StaffApi::class.java)
+    }
+
+    fun getManagerAdminApi(token: String): ManagerAdminApi {
+        return getRetrofit(token).create(ManagerAdminApi::class.java)
+    }
+
+    // Giữ lại hàm cũ để không gây lỗi compile ngay lập tức ở các nơi gọi cũ
+    @Deprecated("Dùng getManagerAdminApi(token) thay thế", ReplaceWith("getManagerAdminApi(token)"))
+    fun create(token: String): ManagerAdminApi = getManagerAdminApi(token)
 }

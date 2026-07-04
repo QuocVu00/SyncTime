@@ -6,8 +6,10 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+import com.example.synctime.data.model.PositionType
+
 @Entity(
-    tableName = "schedules", // Bảng phân lịch làm việc
+    tableName = "schedules",
     foreignKeys = [
         ForeignKey(
             entity = UserEntity::class,
@@ -22,15 +24,22 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
+            entity = BranchEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["branch_id"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
             entity = UserEntity::class,
             parentColumns = ["id"],
             childColumns = ["created_by"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
-        Index(value = ["user_id", "work_date"], unique = true), // Một người không thể có 2 lịch trong 1 ngày
         Index(value = ["user_id"]),
+        Index(value = ["shift_id"]),
+        Index(value = ["branch_id"]),
         Index(value = ["work_date"])
     ]
 )
@@ -39,16 +48,30 @@ data class ScheduleEntity(
     val id: Int = 0,
 
     @ColumnInfo(name = "user_id")
-    val userId: Int, // Nhân viên được phân lịch
+    val userId: Int,
 
     @ColumnInfo(name = "shift_id")
-    val shiftId: Int, // Ca làm việc (Sáng/Chiều/Tối)
+    val shiftId: Int,
+
+    @ColumnInfo(name = "branch_id")
+    val branchId: Int,
 
     @ColumnInfo(name = "work_date")
-    val workDate: String, // Ngày làm việc (Định dạng YYYY-MM-DD)
+    val workDate: String, // YYYY-MM-DD
 
-    val status: String, // Trạng thái: PENDING (Chờ), COMPLETED (Xong), CANCELLED (Hủy)
+    val position: PositionType,
+
+    @ColumnInfo(name = "start_time")
+    val startTime: String, // HH:mm
+
+    @ColumnInfo(name = "end_time")
+    val endTime: String, // HH:mm
+
+    val status: ScheduleStatus = ScheduleStatus.SCHEDULED,
 
     @ColumnInfo(name = "created_by")
-    val createdBy: Int // ID người phân lịch (thường là Manager)
+    val createdBy: Int?,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long = System.currentTimeMillis()
 )

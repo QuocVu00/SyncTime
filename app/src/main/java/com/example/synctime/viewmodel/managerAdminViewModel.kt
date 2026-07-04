@@ -201,7 +201,7 @@ class ManagerAdminViewModel(
                 val response = api.getManagerStaff()
 
                 if (response.isSuccessful) {
-                    _staffList.value = response.body() ?: emptyList()
+                    _staffList.value = response.body()?.data ?: emptyList()
                     _message.value = ""
                 } else {
                     _message.value = "Không tải được danh sách nhân viên"
@@ -261,7 +261,7 @@ class ManagerAdminViewModel(
                 val response = api.getRequests()
 
                 if (response.isSuccessful) {
-                    _requests.value = response.body() ?: emptyList()
+                    _requests.value = response.body()?.data ?: emptyList()
                     _message.value = ""
                 } else {
                     _message.value = "Không tải được danh sách đơn"
@@ -398,7 +398,7 @@ class ManagerAdminViewModel(
                 val response = api.getManagerAttendance()
 
                 if (response.isSuccessful) {
-                    _attendance.value = response.body() ?: emptyList()
+                    _attendance.value = response.body()?.data ?: emptyList()
                     _message.value = ""
                 } else {
                     _message.value = "Không tải được lịch sử chấm công"
@@ -607,7 +607,7 @@ class ManagerAdminViewModel(
                 val response = api.getBranches()
 
                 if (response.isSuccessful) {
-                    _branches.value = response.body() ?: emptyList()
+                    _branches.value = response.body()?.data ?: emptyList()
                     _message.value = ""
                 } else {
                     _message.value = "Không tải được danh sách chi nhánh"
@@ -728,7 +728,7 @@ class ManagerAdminViewModel(
                 val response = api.getPositionSalaries()
 
                 if (response.isSuccessful) {
-                    _positionSalaries.value = response.body() ?: emptyList()
+                    _positionSalaries.value = response.body()?.data ?: emptyList()
                     _message.value = ""
                 } else {
                     _message.value = "Không tải được lương chức vụ"
@@ -841,7 +841,7 @@ class ManagerAdminViewModel(
                 val response = api.getSalaryReport()
 
                 if (response.isSuccessful) {
-                    _salary.value = response.body() ?: emptyList()
+                    _salary.value = response.body()?.data ?: emptyList()
                     _message.value = ""
                 } else {
                     _message.value = "Không tải được bảng lương"

@@ -51,7 +51,7 @@ class BranchRepository(
     /**
      * Tạo chi nhánh mới lên Server
      */
-    suspend fun createBranchRemote(branchRequest: BranchRequest): Result<String> {
+    suspend fun createBranchRemote(branchRequest: BranchRequest): Result<String?> {
         return try {
             val response = managerAdminApi.createBranch(branchRequest)
             if (response.isSuccessful) {
@@ -72,7 +72,7 @@ class BranchRepository(
     /**
      * Cập nhật chi nhánh trên Server
      */
-    suspend fun updateBranchRemote(id: Int, branchRequest: BranchRequest): Result<String> {
+    suspend fun updateBranchRemote(id: Int, branchRequest: BranchRequest): Result<String?> {
         return try {
             val response = managerAdminApi.updateBranch(id, branchRequest)
             if (response.isSuccessful) {

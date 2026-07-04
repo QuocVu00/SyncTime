@@ -29,7 +29,7 @@ class ScheduleRepository(
     /**
      * Tạo lịch làm việc mới trên Server (Dành cho Manager)
      */
-    suspend fun createScheduleRemote(request: CreateScheduleRequest): Result<String> {
+    suspend fun createScheduleRemote(request: CreateScheduleRequest): Result<String?> {
         return try {
             val response = managerAdminApi.createSchedule(request)
 

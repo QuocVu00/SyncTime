@@ -7,7 +7,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
-    tableName = "attendances", // Bảng dữ liệu chấm công thực tế
+    tableName = "attendances",
     foreignKeys = [
         ForeignKey(
             entity = UserEntity::class,
@@ -20,11 +20,18 @@ import androidx.room.PrimaryKey
             parentColumns = ["id"],
             childColumns = ["schedule_id"],
             onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = BranchEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["branch_id"],
+            onDelete = ForeignKey.CASCADE
         )
     ],
     indices = [
-        Index(value = ["schedule_id"], unique = true), // Mỗi lịch làm việc chỉ có tối đa 1 bản ghi chấm công
-        Index(value = ["user_id"])
+        Index(value = ["user_id"]),
+        Index(value = ["schedule_id"], unique = true),
+        Index(value = ["branch_id"])
     ]
 )
 data class AttendanceEntity(
@@ -35,22 +42,44 @@ data class AttendanceEntity(
     val userId: Int,
 
     @ColumnInfo(name = "schedule_id")
-    val scheduleId: Int, // Liên kết với lịch đã phân
+    val scheduleId: Int,
+
+    @ColumnInfo(name = "branch_id")
+    val branchId: Int,
 
     @ColumnInfo(name = "check_in_time")
-    val checkInTime: Long?, // Thời gian vào làm (Unix timestamp)
+    val checkInTime: Long?,
 
     @ColumnInfo(name = "check_out_time")
-    val checkOutTime: Long?, // Thời gian về (Unix timestamp)
+    val checkOutTime: Long?,
 
     @ColumnInfo(name = "check_in_bssid")
-    val checkInBssid: String?, // Địa chỉ Wifi khi check-in
+    val checkInBssid: String?,
 
     @ColumnInfo(name = "check_out_bssid")
-    val checkOutBssid: String?, // Địa chỉ Wifi khi check-out
+    val checkOutBssid: String?,
 
-    val status: String, // Trạng thái: VALID (Hợp lệ), LATE (Muộn), INVALID_WIFI, v.v.
+    @ColumnInfo(name = "check_in_status")
+    val checkInStatus: AttendanceStatus = AttendanceStatus.VALID,
+
+    @ColumnInfo(name = "check_out_status")
+    val checkOutStatus: AttendanceStatus = AttendanceStatus.VALID,
+
+    @ColumnInfo(name = "late_minutes")
+    val lateMinutes: Int = 0,
+
+    @ColumnInfo(name = "overtime_minutes")
+    val overtimeMinutes: Int = 0,
+
+    @ColumnInfo(name = "total_hours")
+    val totalHours: Double = 0.0,
+
+    @ColumnInfo(name = "is_kitchen")
+    val isKitchen: Boolean = false,
 
     @ColumnInfo(name = "created_at")
-    val createdAt: Long
+    val createdAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: Long = System.currentTimeMillis()
 )

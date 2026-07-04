@@ -4,11 +4,12 @@ import com.example.synctime.data.api.ManagerAdminApi
 import com.example.synctime.data.local.dao.AttendanceDao
 import com.example.synctime.data.local.entity.AttendanceEntity
 import com.example.synctime.data.model.AttendanceDto
+import com.example.synctime.data.model.SalaryDto
 import kotlinx.coroutines.flow.Flow
 
 class AttendanceRepository(
     private val attendanceDao: AttendanceDao,
-    private val managerAdminApi: ManagerAdminApi // Thêm API vào để lấy dữ liệu từ Server
+    private val managerAdminApi: ManagerAdminApi
 ) {
     // --- LOCAL DATABASE (Room) ---
     val allAttendances: Flow<List<AttendanceEntity>> = attendanceDao.getAllAttendances()
@@ -19,8 +20,12 @@ class AttendanceRepository(
 
     fun getAttendancesByUserId(userId: Int) = attendanceDao.getAttendancesByUserId(userId)
 
+    /**
+     * Lấy báo cáo lương từ database cục bộ
+     */
+    fun getLocalSalaryReport(): Flow<List<SalaryDto>> = attendanceDao.getSalaryReport()
 
-    // --- REMOTE API (Chuẩn hóa theo Phần 2) ---
+    // --- REMOTE API ---
 
     /**
      * Lấy danh sách chấm công từ Server cho Manager
@@ -28,20 +33,10 @@ class AttendanceRepository(
     suspend fun fetchManagerAttendance(): Result<List<AttendanceDto>?> {
         return try {
             val response = managerAdminApi.getManagerAttendance()
-
-            if (response.isSuccessful) {
-                val apiResponse = response.body()
-                // Kiểm tra field 'success' theo chuẩn chung của nhóm
-                if (apiResponse?.success == true) {
-                    // Trả về data (List<AttendanceDto>) nếu thành công
-                    Result.success(apiResponse.data)
-                } else {
-                    // Trả về message lỗi từ server (ví dụ: "Không có quyền")
-                    Result.failure(Exception(apiResponse?.message ?: "Lỗi logic từ Server"))
-                }
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.data)
             } else {
-                // Lỗi HTTP (404, 500...)
-                Result.failure(Exception("Lỗi kết nối: ${response.code()}"))
+                Result.failure(Exception(response.body()?.message ?: "Lỗi lấy danh sách chấm công"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -57,7 +52,23 @@ class AttendanceRepository(
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()?.data)
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Lỗi lấy báo cáo"))
+                Result.failure(Exception(response.body()?.message ?: "Lỗi lấy báo cáo chấm công"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Lấy báo cáo lương (cho Admin) từ Server
+     */
+    suspend fun fetchSalaryReport(): Result<List<SalaryDto>?> {
+        return try {
+            val response = managerAdminApi.getSalaryReport()
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.data)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Lỗi lấy báo cáo lương"))
             }
         } catch (e: Exception) {
             Result.failure(e)

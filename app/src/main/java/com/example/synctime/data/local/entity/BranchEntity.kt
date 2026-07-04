@@ -21,8 +21,11 @@ data class BranchEntity(
     val wifiBssid: String,
 
     @ColumnInfo(name = "reward_rate")
-    val rewardRate: Double?,
+    val rewardRate: Double = 1.0,
     
     @ColumnInfo(name = "created_at")
-    val createdAt: Long
+    val createdAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: Long = System.currentTimeMillis()
 )

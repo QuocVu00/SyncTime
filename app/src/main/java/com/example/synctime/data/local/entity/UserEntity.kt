@@ -6,20 +6,28 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+import com.example.synctime.data.model.PositionType
+
 @Entity(
-    tableName = "users", // Tên bảng trong database
+    tableName = "users",
     foreignKeys = [
         ForeignKey(
             entity = BranchEntity::class,
             parentColumns = ["id"],
             childColumns = ["branch_id"],
-            onDelete = ForeignKey.CASCADE // Nếu chi nhánh bị xóa, người dùng thuộc chi nhánh đó cũng bị xóa
+            onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = UserEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["created_by"],
+            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
-        Index(value = ["email"], unique = true), // Email không được trùng
-        Index(value = ["device_id"], unique = true), // Mỗi thiết bị chỉ cho 1 tài khoản
-        Index(value = ["branch_id"]) // Tăng tốc độ tìm kiếm theo chi nhánh
+        Index(value = ["email"], unique = true),
+        Index(value = ["branch_id"]),
+        Index(value = ["created_by"])
     ]
 )
 data class UserEntity(
@@ -34,19 +42,22 @@ data class UserEntity(
     @ColumnInfo(name = "password_hash")
     val passwordHash: String,
 
-    val role: String, // Vai trò: ADMIN, MANAGER, STAFF
+    val role: UserRole,
+
+    val position: PositionType,
 
     @ColumnInfo(name = "branch_id")
-    val branchId: Int, // ID chi nhánh làm việc
+    val branchId: Int?,
 
-    @ColumnInfo(name = "base_salary")
-    val baseSalary: Double, // Lương cơ bản
+    @ColumnInfo(name = "is_active")
+    val isActive: Boolean = true,
 
-    @ColumnInfo(name = "device_id")
-    val deviceId: String?, // ID thiết bị dùng để chấm công
-
-    val status: String, // Trạng thái: ACTIVE (đang làm), INACTIVE (đã nghỉ)
+    @ColumnInfo(name = "created_by")
+    val createdBy: Int?,
 
     @ColumnInfo(name = "created_at")
-    val createdAt: Long // Ngày tạo tài khoản
+    val createdAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: Long = System.currentTimeMillis()
 )

@@ -1,208 +1,143 @@
 package com.example.synctime.data.model
 
+import com.google.gson.annotations.SerializedName
+
 data class ApiMessage(
     val message: String? = null
 )
 
-/*
-    Chức vụ nhân viên trong app SyncTime
+// --- AUTH ---
 
-    SERVER      = Phục vụ
-    BARISTA     = Pha chế
-    CASHIER     = Thu ngân
-    SUPERVISOR  = Giám sát
-    KITCHEN     = Bếp
-    RUNNER      = Tiếp thực
-*/
-enum class PositionType(
-    val code: String,
-    val displayName: String,
-    val calculateLateAndOvertime: Boolean
-) {
-    SERVER(
-        code = "SERVER",
-        displayName = "Phục vụ",
-        calculateLateAndOvertime = true
-    ),
+data class LoginRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String
+)
 
-    BARISTA(
-        code = "BARISTA",
-        displayName = "Pha chế",
-        calculateLateAndOvertime = true
-    ),
+data class LoginResponse(
+    @SerializedName("token") val token: String,
+    @SerializedName("user") val user: UserAuthDto
+)
 
-    CASHIER(
-        code = "CASHIER",
-        displayName = "Thu ngân",
-        calculateLateAndOvertime = true
-    ),
+data class UserAuthDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("full_name") val fullName: String,
+    @SerializedName("role") val role: UserRole,
+    @SerializedName("position") val position: PositionType,
+    @SerializedName("branch_id") val branchId: Int?
+)
 
-    SUPERVISOR(
-        code = "SUPERVISOR",
-        displayName = "Giám sát",
-        calculateLateAndOvertime = true
-    ),
-
-    KITCHEN(
-        code = "KITCHEN",
-        displayName = "Bếp",
-        calculateLateAndOvertime = false
-    ),
-
-    RUNNER(
-        code = "RUNNER",
-        displayName = "Tiếp thực",
-        calculateLateAndOvertime = true
-    );
-
-    companion object {
-        fun fromCode(code: String?): PositionType {
-            return entries.firstOrNull { it.code == code } ?: SERVER
-        }
-    }
-}
+// --- COMMON & STAFF ---
 
 data class StaffDto(
-    val id: Int,
-    val fullName: String,
-    val email: String,
-    val role: String,
-    val branchId: Int?,
-
-    /*
-        Các field mới thêm để phục vụ tạo lịch làm.
-        Cho giá trị mặc định để không làm hỏng code cũ.
-    */
-    val position: String = "SERVER",
-    val positionName: String = "Phục vụ",
-    val branchName: String = "Chi nhánh chính"
+    @SerializedName("id") val id: Int,
+    @SerializedName("full_name") val fullName: String,
+    @SerializedName("email") val email: String,
+    @SerializedName("role") val role: UserRole,
+    @SerializedName("branch_id") val branchId: Int?,
+    @SerializedName("position") val position: PositionType = PositionType.SERVER,
+    @SerializedName("position_name") val positionName: String = "Phục vụ",
+    @SerializedName("branch_name") val branchName: String = "Chi nhánh chính"
 )
 
 data class RequestDto(
-    val id: Int,
-    val userId: Int,
-    val fullName: String?,
-    val type: String,
-    val reason: String,
-    val targetDate: String,
-    val status: String
+    @SerializedName("id") val id: Int,
+    @SerializedName("user_id") val userId: Int,
+    @SerializedName("full_name") val fullName: String?,
+    @SerializedName("type") val type: RequestType,
+    @SerializedName("reason") val reason: String,
+    @SerializedName("target_date") val targetDate: String,
+    @SerializedName("status") val status: RequestStatus,
+    @SerializedName("response_note") val responseNote: String? = null
 )
 
 data class AttendanceDto(
-    val id: Int,
-    val userId: Int,
-    val fullName: String?,
-    val checkInTime: String?,
-    val checkOutTime: String?,
-    val status: String,
-    val checkInBssid: String?,
-    val checkOutBssid: String?,
-
-    /*
-        Các field mới để sau này hiển thị trễ/tăng ca/lương.
-        Hiện tại có default nên không ảnh hưởng code cũ.
-    */
-    val position: String = "SERVER",
-    val positionName: String = "Phục vụ",
-    val lateMinutes: Int = 0,
-    val overtimeMinutes: Int = 0,
-    val totalHours: Double = 0.0
+    @SerializedName("id") val id: Int,
+    @SerializedName("user_id") val userId: Int,
+    @SerializedName("full_name") val fullName: String?,
+    @SerializedName("check_in_time") val checkInTime: String?,
+    @SerializedName("check_out_time") val checkOutTime: String?,
+    @SerializedName("status") val status: AttendanceStatus,
+    @SerializedName("check_in_bssid") val checkInBssid: String?,
+    @SerializedName("check_out_bssid") val checkOutBssid: String?,
+    @SerializedName("position") val position: PositionType = PositionType.SERVER,
+    @SerializedName("position_name") val positionName: String = "Phục vụ",
+    @SerializedName("late_minutes") val lateMinutes: Int = 0,
+    @SerializedName("overtime_minutes") val overtimeMinutes: Int = 0,
+    @SerializedName("total_hours") val totalHours: Double = 0.0
 )
 
+data class NotificationDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("user_id") val userId: Int,
+    @SerializedName("title") val title: String,
+    @SerializedName("content") val content: String,
+    @SerializedName("type") val type: String,
+    @SerializedName("is_read") val isRead: Boolean,
+    @SerializedName("created_at") val createdAt: String
+)
+
+// --- REQUEST BODIES ---
+
+data class CreateStaffRequest(
+    @SerializedName("full_name") val fullName: String,
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String,
+    @SerializedName("role") val role: UserRole = UserRole.STAFF,
+    @SerializedName("position") val position: PositionType,
+    @SerializedName("branch_id") val branchId: Int?
+)
+
+data class CreateMultiScheduleRequest(
+    @SerializedName("user_ids") val userIds: List<Int>,
+    @SerializedName("shift_id") val shiftId: Int,
+    @SerializedName("work_date") val workDate: String
+)
+
+data class CheckInRequest(
+    @SerializedName("schedule_id") val scheduleId: Int,
+    @SerializedName("bssid") val bssid: String,
+    @SerializedName("android_id") val androidId: String
+)
+
+data class CheckOutRequest(
+    @SerializedName("schedule_id") val scheduleId: Int,
+    @SerializedName("bssid") val bssid: String,
+    @SerializedName("android_id") val androidId: String
+)
+
+// --- ADMIN ---
+
 data class BranchDto(
-    val id: Int,
-    val name: String,
-    val address: String,
-    val wifiBssid: String,
-    val rewardRate: Double?
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("address") val address: String,
+    @SerializedName("wifi_bssid") val wifiBssid: String,
+    @SerializedName("reward_rate") val rewardRate: Double?
 )
 
 data class SalaryDto(
-    val userId: Int,
-    val fullName: String,
-    val totalHours: Double,
-    val salary: Double,
-
-    /*
-        Field mới để bảng lương rõ hơn.
-    */
-    val position: String = "SERVER",
-    val positionName: String = "Phục vụ",
-    val hourlyRate: Double = 0.0,
-    val lateMinutes: Int = 0,
-    val overtimeMinutes: Int = 0
+    @SerializedName("user_id") val userId: Int,
+    @SerializedName("full_name") val fullName: String,
+    @SerializedName("total_hours") val totalHours: Double,
+    @SerializedName("salary") val salary: Double,
+    @SerializedName("position") val position: PositionType = PositionType.SERVER,
+    @SerializedName("position_name") val positionName: String = "Phục vụ",
+    @SerializedName("hourly_rate") val hourlyRate: Double = 0.0,
+    @SerializedName("late_minutes") val lateMinutes: Int = 0,
+    @SerializedName("overtime_minutes") val overtimeMinutes: Int = 0
 )
 
-data class BranchRequest(
-    val name: String,
-    val address: String,
-    val wifiBssid: String,
-    val rewardRate: Double?
-)
-
-/*
-    Model cũ giữ lại để không lỗi API cũ.
-*/
-data class CreateScheduleRequest(
-    val userId: Int,
-    val shiftId: Int,
-    val workDate: String
-)
-
-
-//Thông báo trả về
-data class ApiResponse<T>(
-    val success: Boolean,
-    val message: String,
-    val data: T? = null
-)
-
-/*
-    Model mới: tạo lịch cho nhiều nhân viên cùng lúc.
-    Manager chọn ngày, ca, danh sách nhân viên.
-*/
-data class CreateMultiScheduleRequest(
-    val userIds: List<Int>,
-    val shiftId: Int,
-    val workDate: String
-)
-
-/*
-    Ca làm mẫu.
-    Ví dụ:
-    Ca sáng 08:00 - 12:00
-*/
-data class ShiftOption(
-    val id: Int,
-    val name: String,
-    val startTime: String,
-    val endTime: String
-)
-
-/*
-    Lương theo chức vụ.
-    Admin có thể sửa hourlyRate.
-*/
 data class PositionSalaryDto(
-    val position: String,
-    val positionName: String,
-    val hourlyRate: Double
+    @SerializedName("position") val position: PositionType,
+    @SerializedName("position_name") val positionName: String,
+    @SerializedName("hourly_rate") val hourlyRate: Double
 )
 
-data class UpdatePositionSalaryRequest(
-    val hourlyRate: Double
-)
+// --- WRAPPER ---
 
-/*
-    Manager tạo nhân viên mới.
-    Role mặc định nên là STAFF.
-*/
-data class CreateStaffRequest(
-    val fullName: String,
-    val email: String,
-    val password: String,
-    val role: String = "STAFF",
-    val position: String,
-    val branchId: Int?
+data class ApiResponse<T>(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("message") val message: String,
+    @SerializedName("data") val data: T? = null,
+    @SerializedName("error_code") val errorCode: String? = null
 )
-
