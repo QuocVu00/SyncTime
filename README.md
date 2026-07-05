@@ -3,6 +3,8 @@ feature/backend-ktor-postgresql
 
 Cách chạy:
 docker compose up -d
+
+
 .\gradlew :app:run
 
 Test:
