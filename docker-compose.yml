@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: synctime_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: synctime
+      POSTGRES_USER: synctime
+      POSTGRES_PASSWORD: synctime123
+    ports:
+      - "5432:5432"
+    volumes:
+      - synctime_pgdata:/var/lib/postgresql/data
+
+volumes:
+  synctime_pgdata:
