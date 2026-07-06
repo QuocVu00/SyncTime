@@ -1,14 +1,13 @@
-Nhánh backend:
-feature/backend-ktor-postgresql
-
-Cách chạy:
+chạy backend
+mở docker 
 docker compose up -d
+
+tenminal chạy
 
 $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
 
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
 
-.\gradlew :app:run
+java -version
 
-Test:
-http://localhost:8080/health
+.\gradlew :app:run
