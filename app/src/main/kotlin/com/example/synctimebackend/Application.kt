@@ -2,40 +2,49 @@ package com.example.synctimebackend
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.gson.gson
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import io.ktor.server.plugins.callloging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.sql.Connection
-import java.sql.PreparedStatement
 import java.sql.ResultSet
-import java.sql.Statement
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.util.UUID
 
 fun main() {
+    val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
     embeddedServer(
         factory = Netty,
-        port = 8080,
+        port = port,
         host = "0.0.0.0",
         module = Application::module
     ).start(wait = true)
 }
 
 fun Application.module() {
-    install(CallLogging)
+    Db.init()
 
     install(ContentNegotiation) {
         gson {
@@ -43,1191 +52,1308 @@ fun Application.module() {
         }
     }
 
-    Db.init()
-    Db.createTables()
-    Db.seedData()
+    install(CORS) {
+        anyHost()
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Put)
+        allowHeader(HttpHeaders.Authorization)
+        allowHeader(HttpHeaders.ContentType)
+    }
 
     routing {
         get("/health") {
-            call.respond(mapOf("status" to "OK", "service" to "SyncTime Backend"))
-        }
-
-        // ================= AUTH =================
-
-        post("/login") {
-            val body = call.receive<LoginRequest>()
-            call.respond(AuthService.login(body))
-        }
-
-        post("/api/auth/login") {
-            val body = call.receive<LoginRequest>()
-            call.respond(AuthService.login(body))
-        }
-
-        // ================= STAFF API CŨ CỦA KHOA =================
-
-        post("/create-request") {
-            val body = call.receive<OldLeaveRequest>()
-            val result = RequestService.createFromOldStaff(body)
-            call.respond(result)
-        }
-
-        post("/my-requests") {
-            val body = call.receive<Map<String, String>>()
-            val androidId = body["androidId"]
-            call.respond(RequestService.getMyRequests(androidId))
-        }
-
-        post("/schedule") {
-            call.receive<Map<String, String>>()
-            call.respond(ScheduleResponse(success = true, schedules = ScheduleService.getMockSchedules()))
-        }
-
-        post("/checkin") {
-            val body = call.receive<CheckInRequest>()
-            call.respond(AttendanceService.checkIn(body))
-        }
-
-        post("/checkout") {
-            val body = call.receive<CheckOutRequest>()
-            call.respond(AttendanceService.checkOut(body))
-        }
-
-        post("/status") {
-            call.receive<Map<String, String>>()
-            call.respond(
-                AttendanceStatusResponse(
-                    success = true,
-                    status = "Not started",
-                    checkInTime = null,
-                    checkOutTime = null
-                )
+            call.respondText(
+                text = """{"success":true,"message":"SyncTime backend is running"}""",
+                contentType = ContentType.Application.Json
             )
         }
 
-        // ================= STAFF API MỚI =================
+        post("/auth/login") {
+            val rawText = call.receiveText()
 
-        post("/api/staff/requests") {
-            val body = call.receive<StaffCreateRequest>()
-            val result = RequestService.createFromNewStaff(body)
-            call.respond(result)
-        }
-
-        post("/api/staff/requests/my") {
-            val body = call.receive<Map<String, String>>()
-            val androidId = body["androidId"]
-            call.respond(RequestService.getMyRequests(androidId))
-        }
-
-        post("/api/staff/check-in") {
-            val body = call.receive<CheckInRequest>()
-            call.respond(AttendanceService.checkIn(body))
-        }
-
-        post("/api/staff/check-out") {
-            val body = call.receive<CheckOutRequest>()
-            call.respond(AttendanceService.checkOut(body))
-        }
-
-        post("/api/staff/status") {
-            call.receive<Map<String, String>>()
-            call.respond(
-                AttendanceStatusResponse(
-                    success = true,
-                    status = "Not started",
-                    checkInTime = null,
-                    checkOutTime = null
+            val jsonObject = try {
+                Json.parseToJsonElement(rawText).jsonObject
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    MessageResponse(
+                        success = false,
+                        message = "JSON login không hợp lệ. Body nhận được: $rawText. Lỗi: ${e.message}"
+                    )
                 )
+                return@post
+            }
+
+            fun getString(vararg keys: String): String {
+                for (key in keys) {
+                    val value = jsonObject[key]?.jsonPrimitive?.contentOrNull
+                    if (!value.isNullOrBlank()) return value
+                }
+                return ""
+            }
+
+            val email = getString("email").trim()
+            val password = getString("password").trim()
+            val androidId = getString("androidId", "deviceId", "android_id").trim()
+            val fcmToken = getString("fcmToken", "fcm_token").ifBlank { null }
+
+            if (email.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, MessageResponse(false, "Thiếu email. Body: $rawText"))
+                return@post
+            }
+
+            if (password.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, MessageResponse(false, "Thiếu mật khẩu. Body: $rawText"))
+                return@post
+            }
+
+            if (androidId.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, MessageResponse(false, "Thiếu Android ID hoặc deviceId. Body: $rawText"))
+                return@post
+            }
+
+            val body = LoginRequest(
+                email = email,
+                password = password,
+                androidId = androidId,
+                deviceId = androidId,
+                android_id = androidId,
+                fcmToken = fcmToken
             )
+
+            val result = try {
+                Db.login(body)
+            } catch (e: Exception) {
+                e.printStackTrace()
+
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    MessageResponse(
+                        success = false,
+                        message = "Lỗi server khi login: ${e::class.simpleName}: ${e.message}"
+                    )
+                )
+                return@post
+            }
+
+            when (result) {
+                is LoginResult.Success -> call.respond(result.response)
+                is LoginResult.Fail -> call.respond(result.status, MessageResponse(false, result.message))
+            }
+        }
+        get("/me") {
+            val user = call.requireUser() ?: return@get
+            call.respond(user)
         }
 
-        post("/api/staff/schedules") {
-            call.receive<Map<String, String>>()
-            call.respond(ScheduleResponse(success = true, schedules = ScheduleService.getMockSchedules()))
+        post("/attendance/check-in") {
+            val user = call.requireUser("STAFF", "MANAGER") ?: return@post
+            val body = call.receive<AttendanceRequest>()
+
+            if (!call.verifyDeviceAndWifi(user, body.deviceId, body.currentBssid)) {
+                return@post
+            }
+
+            val result = Db.checkIn(user.id)
+            call.respond(result.status, MessageResponse(result.success, result.message))
         }
 
-        // ================= MANAGER =================
+        post("/attendance/check-out") {
+            val user = call.requireUser("STAFF", "MANAGER") ?: return@post
+            val body = call.receive<AttendanceRequest>()
 
-        get("/api/manager/staff") {
-            call.respond(ManagerService.getStaff())
+            if (!call.verifyDeviceAndWifi(user, body.deviceId, body.currentBssid)) {
+                return@post
+            }
+
+            val result = Db.checkOut(user.id)
+            call.respond(result.status, MessageResponse(result.success, result.message))
         }
 
-        post("/api/manager/staff") {
+        get("/attendance/status") {
+            val user = call.requireUser("STAFF", "MANAGER") ?: return@get
+            call.respond(Db.getAttendanceStatus(user.id))
+        }
+
+        get("/branches") {
+            call.requireUser("ADMIN", "MANAGER") ?: return@get
+            call.respond(Db.getBranches())
+        }
+
+        post("/branches") {
+            call.requireUser("ADMIN") ?: return@post
+            val body = call.receive<BranchRequest>()
+            call.respond(Db.createBranch(body))
+        }
+
+        put("/branches/{id}") {
+            call.requireUser("ADMIN") ?: return@put
+            val id = call.parameters["id"]?.toIntOrNull()
+            if (id == null) {
+                call.respond(HttpStatusCode.BadRequest, MessageResponse(false, "ID chi nhánh không hợp lệ"))
+                return@put
+            }
+
+            val body = call.receive<BranchRequest>()
+            call.respond(Db.updateBranch(id, body))
+        }
+
+        get("/shifts") {
+            call.requireUser() ?: return@get
+            call.respond(Db.getShifts())
+        }
+
+        post("/shifts") {
+            call.requireUser("ADMIN", "MANAGER") ?: return@post
+            val body = call.receive<ShiftRequest>()
+            call.respond(Db.createShift(body))
+        }
+
+        get("/staff") {
+            val user = call.requireUser("ADMIN", "MANAGER") ?: return@get
+            call.respond(Db.getStaff(user))
+        }
+
+        post("/staff") {
+            val user = call.requireUser("ADMIN", "MANAGER") ?: return@post
             val body = call.receive<CreateStaffRequest>()
-            call.respond(ManagerService.createStaff(body))
+            call.respond(Db.createStaff(user, body))
         }
 
-        get("/api/manager/requests") {
-            call.respond(RequestService.getManagerRequests())
+        get("/schedules/my") {
+            val user = call.requireUser("STAFF", "MANAGER") ?: return@get
+            call.respond(Db.getMySchedules(user.id))
         }
 
-        post("/api/manager/requests/{id}/approve") {
-            val id = call.parameters["id"]?.toIntOrNull()
-            if (id == null) {
-                call.respond(HttpStatusCode.BadRequest, ApiMessage("ID không hợp lệ"))
-                return@post
-            }
-
-            call.respond(RequestService.updateRequestStatus(id, "APPROVED"))
-        }
-
-        post("/api/manager/requests/{id}/reject") {
-            val id = call.parameters["id"]?.toIntOrNull()
-            if (id == null) {
-                call.respond(HttpStatusCode.BadRequest, ApiMessage("ID không hợp lệ"))
-                return@post
-            }
-
-            call.respond(RequestService.updateRequestStatus(id, "REJECTED"))
-        }
-
-        get("/api/manager/attendance") {
-            call.respond(AttendanceService.getManagerAttendance())
-        }
-
-        post("/api/manager/schedules") {
-            val body = call.receive<CreateScheduleRequest>()
-            call.respond(ScheduleService.createOneSchedule(body))
-        }
-
-        post("/api/manager/schedules/multiple") {
+        post("/schedules/multi") {
+            val user = call.requireUser("ADMIN", "MANAGER") ?: return@post
             val body = call.receive<CreateMultiScheduleRequest>()
-            call.respond(ScheduleService.createMultiSchedule(body))
+            call.respond(Db.createSchedules(user, body))
         }
 
-        // ================= ADMIN =================
-
-        get("/api/admin/branches") {
-            call.respond(AdminService.getBranches())
+        get("/requests") {
+            val user = call.requireUser() ?: return@get
+            call.respond(Db.getRequests(user))
         }
 
-        post("/api/admin/branches") {
-            val body = call.receive<BranchRequest>()
-            call.respond(AdminService.createBranch(body))
+        post("/requests") {
+            val user = call.requireUser("STAFF", "MANAGER") ?: return@post
+            val body = call.receive<CreateRequestBody>()
+            call.respond(Db.createRequest(user, body))
         }
 
-        put("/api/admin/branches/{id}") {
+        post("/requests/{id}/approve") {
+            val user = call.requireUser("ADMIN", "MANAGER") ?: return@post
             val id = call.parameters["id"]?.toIntOrNull()
             if (id == null) {
-                call.respond(HttpStatusCode.BadRequest, ApiMessage("ID chi nhánh không hợp lệ"))
-                return@put
+                call.respond(HttpStatusCode.BadRequest, MessageResponse(false, "ID yêu cầu không hợp lệ"))
+                return@post
             }
 
-            val body = call.receive<BranchRequest>()
-            call.respond(AdminService.updateBranch(id, body))
+            call.respond(Db.updateRequestStatus(user, id, "APPROVED"))
         }
 
-        get("/api/admin/position-salaries") {
-            call.respond(AdminService.getPositionSalaries())
-        }
-
-        put("/api/admin/position-salaries/{position}") {
-            val position = call.parameters["position"]
-            if (position.isNullOrBlank()) {
-                call.respond(HttpStatusCode.BadRequest, ApiMessage("Chức vụ không hợp lệ"))
-                return@put
+        post("/requests/{id}/reject") {
+            val user = call.requireUser("ADMIN", "MANAGER") ?: return@post
+            val id = call.parameters["id"]?.toIntOrNull()
+            if (id == null) {
+                call.respond(HttpStatusCode.BadRequest, MessageResponse(false, "ID yêu cầu không hợp lệ"))
+                return@post
             }
 
-            val body = call.receive<UpdatePositionSalaryRequest>()
-            call.respond(AdminService.updatePositionSalary(position, body))
+            call.respond(Db.updateRequestStatus(user, id, "REJECTED"))
         }
 
-        get("/api/admin/salary-report") {
-            call.respond(AdminService.getSalaryReport())
-        }
-
-        get("/api/admin/attendance-report") {
-            call.respond(AttendanceService.getManagerAttendance())
+        get("/salary") {
+            val user = call.requireUser("ADMIN", "MANAGER") ?: return@get
+            call.respond(Db.getSalaryReport(user))
         }
     }
 }
-
-// ================= DATABASE =================
 
 object Db {
     private lateinit var dataSource: HikariDataSource
 
     fun init() {
+        val jdbcUrl = System.getenv("JDBC_URL") ?: "jdbc:postgresql://localhost:5432/synctime"
+        val dbUser = System.getenv("DB_USER") ?: "synctime"
+        val dbPassword = System.getenv("DB_PASSWORD") ?: "123456"
+
         val config = HikariConfig().apply {
-            jdbcUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/synctime"
-            username = System.getenv("DB_USER") ?: "synctime"
-            password = System.getenv("DB_PASSWORD") ?: "synctime123"
-            driverClassName = "org.postgresql.Driver"
+            this.jdbcUrl = jdbcUrl
+            this.username = dbUser
+            this.password = dbPassword
+            this.driverClassName = "org.postgresql.Driver"
+
             maximumPoolSize = 10
+            minimumIdle = 2
+            isAutoCommit = true
+
+            // Sửa lỗi: PostgreSQL không dùng Asia/Saigon
+            connectionInitSql = "SET TIME ZONE 'Asia/Ho_Chi_Minh'"
         }
 
         dataSource = HikariDataSource(config)
+        createSchema()
+        seedData()
     }
 
-    fun connection(): Connection = dataSource.connection
-
-    fun createTables() {
-        connection().use { conn ->
-            conn.createStatement().use { st ->
-                st.executeUpdate(
-                    """
-                    CREATE TABLE IF NOT EXISTS branches (
-                        id SERIAL PRIMARY KEY,
-                        name VARCHAR(100) NOT NULL,
-                        address VARCHAR(255) NOT NULL,
-                        wifi_bssid VARCHAR(100) NOT NULL,
-                        reward_rate DOUBLE PRECISION DEFAULT 1.0,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    """.trimIndent()
-                )
-
-                st.executeUpdate(
-                    """
-                    CREATE TABLE IF NOT EXISTS users (
-                        id SERIAL PRIMARY KEY,
-                        full_name VARCHAR(100) NOT NULL,
-                        email VARCHAR(100) NOT NULL UNIQUE,
-                        password VARCHAR(100) NOT NULL,
-                        role VARCHAR(30) NOT NULL DEFAULT 'STAFF',
-                        position VARCHAR(30) DEFAULT 'SERVER',
-                        branch_id INT REFERENCES branches(id),
-                        android_id VARCHAR(100),
-                        is_active BOOLEAN DEFAULT TRUE,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    """.trimIndent()
-                )
-
-                st.executeUpdate(
-                    """
-                    CREATE TABLE IF NOT EXISTS position_salaries (
-                        id SERIAL PRIMARY KEY,
-                        position VARCHAR(30) NOT NULL UNIQUE,
-                        position_name VARCHAR(50) NOT NULL,
-                        hourly_rate DOUBLE PRECISION NOT NULL,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    """.trimIndent()
-                )
-
-                st.executeUpdate(
-                    """
-                    CREATE TABLE IF NOT EXISTS shifts (
-                        id SERIAL PRIMARY KEY,
-                        name VARCHAR(100) NOT NULL,
-                        start_time VARCHAR(10) NOT NULL,
-                        end_time VARCHAR(10) NOT NULL,
-                        is_active BOOLEAN DEFAULT TRUE
-                    );
-                    """.trimIndent()
-                )
-
-                st.executeUpdate(
-                    """
-                    CREATE TABLE IF NOT EXISTS schedules (
-                        id SERIAL PRIMARY KEY,
-                        user_id INT NOT NULL REFERENCES users(id),
-                        shift_id INT NOT NULL REFERENCES shifts(id),
-                        branch_id INT NOT NULL REFERENCES branches(id),
-                        work_date DATE NOT NULL,
-                        position VARCHAR(30) NOT NULL,
-                        start_time VARCHAR(10) NOT NULL,
-                        end_time VARCHAR(10) NOT NULL,
-                        status VARCHAR(30) DEFAULT 'SCHEDULED',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    """.trimIndent()
-                )
-
-                st.executeUpdate(
-                    """
-                    CREATE TABLE IF NOT EXISTS requests (
-                        id SERIAL PRIMARY KEY,
-                        user_id INT NOT NULL REFERENCES users(id),
-                        type VARCHAR(30) NOT NULL,
-                        reason TEXT NOT NULL,
-                        target_date DATE NOT NULL,
-                        status VARCHAR(30) DEFAULT 'PENDING',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    """.trimIndent()
-                )
-
-                st.executeUpdate(
-                    """
-                    CREATE TABLE IF NOT EXISTS attendance_logs (
-                        id SERIAL PRIMARY KEY,
-                        user_id INT NOT NULL REFERENCES users(id),
-                        schedule_id INT,
-                        branch_id INT REFERENCES branches(id),
-                        check_in_time TIMESTAMP,
-                        check_out_time TIMESTAMP,
-                        check_in_bssid VARCHAR(100),
-                        check_out_bssid VARCHAR(100),
-                        status VARCHAR(50) DEFAULT 'VALID',
-                        late_minutes INT DEFAULT 0,
-                        overtime_minutes INT DEFAULT 0,
-                        total_hours DOUBLE PRECISION DEFAULT 0,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    """.trimIndent()
-                )
-            }
+    private fun <T> useConnection(block: (Connection) -> T): T {
+        return dataSource.connection.use { connection ->
+            block(connection)
         }
     }
 
-    fun seedData() {
-        connection().use { conn ->
-            conn.prepareStatement(
+    private fun createSchema() {
+        useConnection { conn ->
+            conn.exec(
                 """
-                INSERT INTO branches (id, name, address, wifi_bssid, reward_rate)
-                VALUES (1, 'Chi nhánh Quận 12', 'Quận 12, TP.HCM', 'A1:B2:C3:D4:E5:F6', 1.0)
-                ON CONFLICT (id) DO NOTHING;
-                """.trimIndent()
-            ).use { it.executeUpdate() }
+            CREATE TABLE IF NOT EXISTS branches (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                address TEXT NOT NULL,
+                wifi_bssid TEXT NOT NULL,
+                reward_rate DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """.trimIndent()
+            )
 
-            conn.prepareStatement(
+            conn.exec(
                 """
-                INSERT INTO users (full_name, email, password, role, position, branch_id, android_id)
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                full_name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('ADMIN', 'MANAGER', 'STAFF')),
+                branch_id INT REFERENCES branches(id),
+                position TEXT,
+                base_salary DOUBLE PRECISION NOT NULL DEFAULT 0,
+                device_id TEXT,
+                fcm_token TEXT,
+                active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """.trimIndent()
+            )
+
+            conn.exec(
+                """
+            CREATE TABLE IF NOT EXISTS shifts (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """.trimIndent()
+            )
+
+            conn.exec(
+                """
+            CREATE TABLE IF NOT EXISTS schedules (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                shift_id INT NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+                work_date DATE NOT NULL,
+                created_by INT REFERENCES users(id),
+                status TEXT NOT NULL DEFAULT 'APPROVED',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE(user_id, shift_id, work_date)
+            )
+            """.trimIndent()
+            )
+
+            conn.exec(
+                """
+            CREATE TABLE IF NOT EXISTS attendances (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                check_in_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                check_out_time TIMESTAMPTZ,
+                status TEXT NOT NULL DEFAULT 'VALID',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """.trimIndent()
+            )
+
+            conn.exec(
+                """
+            CREATE TABLE IF NOT EXISTS requests (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                type TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                manager_id INT REFERENCES users(id),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """.trimIndent()
+            )
+
+            conn.exec(
+                """
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '30 days',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """.trimIndent()
+            )
+        }
+    }
+    private fun seedData() {
+        useConnection { conn ->
+            conn.exec(
+                """
+                INSERT INTO branches(name, address, wifi_bssid, reward_rate)
+                VALUES 
+                    ('Chi nhánh Quận 12', 'Quận 12, TP.HCM', 'A1:B2:C3:D4:E5:F6', 1.0),
+                    ('Chi nhánh Gò Vấp', 'Gò Vấp, TP.HCM', 'AA:BB:CC:DD:EE:FF', 1.0)
+                ON CONFLICT DO NOTHING
+                """.trimIndent()
+            )
+
+            conn.exec(
+                """
+                INSERT INTO users(full_name, email, password_hash, role, branch_id, position, base_salary)
                 VALUES
-                ('Admin SyncTime', 'admin@synctime.com', '123456', 'ADMIN', 'SUPERVISOR', 1, NULL),
-                ('Manager SyncTime', 'manager@synctime.com', '123456', 'MANAGER', 'SUPERVISOR', 1, NULL),
-                ('Staff Demo', 'staff@synctime.com', '123456', 'STAFF', 'SERVER', 1, 'demo_android_id'),
-                ('Pha Chế Demo', 'barista@synctime.com', '123456', 'STAFF', 'BARISTA', 1, NULL),
-                ('Tiếp Thực Demo', 'runner@synctime.com', '123456', 'STAFF', 'RUNNER', 1, NULL)
-                ON CONFLICT (email) DO NOTHING;
+                    ('Admin SyncTime', 'admin@synctime.vn', '123456', 'ADMIN', NULL, 'ADMIN', 0),
+                    ('Manager Quận 12', 'manager@synctime.vn', '123456', 'MANAGER', 1, 'MANAGER', 12000000),
+                    ('Nguyễn Văn An', 'staff@synctime.vn', '123456', 'STAFF', 1, 'SERVER', 8000000)
+                ON CONFLICT(email) DO NOTHING
                 """.trimIndent()
-            ).use { it.executeUpdate() }
+            )
 
-            conn.prepareStatement(
+            conn.exec(
                 """
-                INSERT INTO position_salaries (position, position_name, hourly_rate)
+                INSERT INTO shifts(name, start_time, end_time)
                 VALUES
-                ('SERVER', 'Phục vụ', 25000),
-                ('BARISTA', 'Pha chế', 30000),
-                ('CASHIER', 'Thu ngân', 28000),
-                ('SUPERVISOR', 'Giám sát', 35000),
-                ('KITCHEN', 'Bếp', 32000),
-                ('RUNNER', 'Tiếp thực', 24000)
-                ON CONFLICT (position) DO NOTHING;
+                    ('Ca sáng', '08:00', '12:00'),
+                    ('Ca chiều', '13:00', '17:00'),
+                    ('Ca tối', '18:00', '22:00')
+                ON CONFLICT DO NOTHING
                 """.trimIndent()
-            ).use { it.executeUpdate() }
+            )
+        }
+    }
 
-            conn.prepareStatement(
+    fun login(body: LoginRequest): LoginResult {
+        return useConnection { conn ->
+            val user = conn.prepareStatement(
                 """
-                INSERT INTO shifts (id, name, start_time, end_time)
-                VALUES
-                (1, 'Ca sáng', '08:00', '12:00'),
-                (2, 'Ca chiều', '13:00', '17:00'),
-                (3, 'Ca tối', '18:00', '22:00'),
-                (4, 'Ca nguyên ngày', '08:00', '17:00')
-                ON CONFLICT (id) DO NOTHING;
-                """.trimIndent()
-            ).use { it.executeUpdate() }
-        }
-    }
-
-    fun update(sql: String, vararg params: Any?): Int {
-        connection().use { conn ->
-            conn.prepareStatement(sql).use { ps ->
-                bindParams(ps, params)
-                return ps.executeUpdate()
-            }
-        }
-    }
-
-    fun insert(sql: String, vararg params: Any?): Int {
-        connection().use { conn ->
-            conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS).use { ps ->
-                bindParams(ps, params)
-                ps.executeUpdate()
-                ps.generatedKeys.use { rs ->
-                    return if (rs.next()) rs.getInt(1) else 0
-                }
-            }
-        }
-    }
-
-    fun <T> query(sql: String, vararg params: Any?, mapper: (ResultSet) -> T): List<T> {
-        connection().use { conn ->
-            conn.prepareStatement(sql).use { ps ->
-                bindParams(ps, params)
-                ps.executeQuery().use { rs ->
-                    val list = mutableListOf<T>()
-                    while (rs.next()) {
-                        list.add(mapper(rs))
-                    }
-                    return list
-                }
-            }
-        }
-    }
-
-    private fun bindParams(ps: PreparedStatement, params: Array<out Any?>) {
-        params.forEachIndexed { index, value ->
-            ps.setObject(index + 1, value)
-        }
-    }
-}
-
-// ================= SERVICES =================
-
-object AuthService {
-    fun login(body: LoginRequest): LoginResponse {
-        val username = body.username.trim()
-        val password = body.password.trim()
-
-        val email = when (username.lowercase(Locale.getDefault())) {
-            "staff" -> "staff@synctime.com"
-            "manager" -> "manager@synctime.com"
-            "admin" -> "admin@synctime.com"
-            else -> username
-        }
-
-        val users = Db.query(
-            """
-            SELECT id, full_name, email, role, position, branch_id
+            SELECT id, full_name, email, role, branch_id, position, device_id, active
             FROM users
-            WHERE email = ? AND password = ? AND is_active = true
-            LIMIT 1
-            """.trimIndent(),
-            email,
-            password
-        ) { rs ->
-            LoginUser(
-                id = rs.getInt("id"),
-                fullName = rs.getString("full_name"),
-                email = rs.getString("email"),
-                role = rs.getString("role"),
-                position = rs.getString("position"),
-                branchId = rs.getInt("branch_id")
-            )
-        }
-
-        if (users.isEmpty()) {
-            return LoginResponse(
-                success = false,
-                message = "Sai tài khoản hoặc mật khẩu",
-                token = null,
-                user = null
-            )
-        }
-
-        val user = users.first()
-
-        return LoginResponse(
-            success = true,
-            message = "Đăng nhập thành công",
-            token = "demo-token-${user.id}-${user.role}",
-            user = user
-        )
-    }
-}
-
-object RequestService {
-    fun createFromOldStaff(body: OldLeaveRequest): OldLeaveResponse {
-        val type = normalizeRequestType(body.type)
-        val date = normalizeDate(body.date)
-        val userId = findStaffUserId(body.androidId)
-
-        Db.insert(
-            """
-            INSERT INTO requests (user_id, type, reason, target_date, status)
-            VALUES (?, ?, ?, ?::date, 'PENDING')
-            """.trimIndent(),
-            userId,
-            type,
-            body.reason,
-            date
-        )
-
-        return OldLeaveResponse(success = true, message = "Gửi đơn thành công")
-    }
-
-    fun createFromNewStaff(body: StaffCreateRequest): StaffCreateRequestResponse {
-        val type = normalizeRequestType(body.type)
-        val date = normalizeDate(body.targetDate)
-        val userId = getDefaultStaffUserId()
-
-        Db.insert(
-            """
-            INSERT INTO requests (user_id, type, reason, target_date, status)
-            VALUES (?, ?, ?, ?::date, 'PENDING')
-            """.trimIndent(),
-            userId,
-            type,
-            body.reason,
-            date
-        )
-
-        return StaffCreateRequestResponse(success = true, message = "Gửi đơn thành công")
-    }
-
-    fun getMyRequests(androidId: String?): StaffRequestsResponse {
-        val userId = findStaffUserId(androidId)
-
-        val requests = Db.query(
-            """
-            SELECT id, type, reason, target_date, status, EXTRACT(EPOCH FROM created_at) * 1000 AS timestamp
-            FROM requests
-            WHERE user_id = ?
-            ORDER BY id DESC
-            """.trimIndent(),
-            userId
-        ) { rs ->
-            StaffRequestItem(
-                id = rs.getInt("id").toString(),
-                type = rs.getString("type"),
-                date = rs.getDate("target_date").toString(),
-                reason = rs.getString("reason"),
-                status = rs.getString("status"),
-                timestamp = rs.getLong("timestamp")
-            )
-        }
-
-        return StaffRequestsResponse(success = true, requests = requests)
-    }
-
-    fun getManagerRequests(): List<RequestDto> {
-        return Db.query(
-            """
-            SELECT r.id, r.user_id, u.full_name, r.type, r.reason, r.target_date, r.status
-            FROM requests r
-            JOIN users u ON u.id = r.user_id
-            ORDER BY r.id DESC
+            WHERE email = ? AND password_hash = ?
             """.trimIndent()
-        ) { rs ->
-            RequestDto(
-                id = rs.getInt("id"),
-                userId = rs.getInt("user_id"),
-                fullName = rs.getString("full_name"),
-                type = rs.getString("type"),
-                reason = rs.getString("reason"),
-                targetDate = rs.getDate("target_date").toString(),
-                status = rs.getString("status")
+            ).use { ps ->
+                ps.setString(1, body.email.trim())
+                ps.setString(2, body.password.trim())
+                ps.executeQuery().use { rs ->
+                    if (rs.next()) rs.toAuthUserWithDevice() else null
+                }
+            } ?: return@useConnection LoginResult.Fail(
+                HttpStatusCode.Unauthorized,
+                "Sai email hoặc mật khẩu"
             )
-        }
-    }
 
-    fun updateRequestStatus(id: Int, status: String): ApiMessage {
-        val count = Db.update(
-            """
-            UPDATE requests
-            SET status = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """.trimIndent(),
-            status,
-            id
-        )
-
-        return if (count > 0) {
-            ApiMessage("Cập nhật đơn thành công")
-        } else {
-            ApiMessage("Không tìm thấy đơn")
-        }
-    }
-
-    private fun findStaffUserId(androidId: String?): Int {
-        if (!androidId.isNullOrBlank()) {
-            val users = Db.query(
-                "SELECT id FROM users WHERE android_id = ? LIMIT 1",
-                androidId
-            ) { rs -> rs.getInt("id") }
-
-            if (users.isNotEmpty()) return users.first()
-        }
-
-        return getDefaultStaffUserId()
-    }
-
-    private fun getDefaultStaffUserId(): Int {
-        val users = Db.query(
-            "SELECT id FROM users WHERE role = 'STAFF' ORDER BY id LIMIT 1"
-        ) { rs -> rs.getInt("id") }
-
-        return users.firstOrNull() ?: 1
-    }
-
-    private fun normalizeRequestType(type: String): String {
-        return when (type.trim().uppercase(Locale.getDefault())) {
-            "LEAVE", "XIN NGHỈ", "XIN NGHI" -> "LEAVE"
-            "SHIFT CHANGE", "CHANGE_SHIFT", "ĐỔI CA", "DOI CA" -> "CHANGE_SHIFT"
-            else -> "CHANGE_SHIFT"
-        }
-    }
-
-    private fun normalizeDate(input: String): String {
-        val value = input.trim()
-
-        return try {
-            if (value.contains("/")) {
-                val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-                LocalDate.parse(value, formatter).toString()
-            } else {
-                LocalDate.parse(value).toString()
+            if (!user.active) {
+                return@useConnection LoginResult.Fail(
+                    HttpStatusCode.Locked,
+                    "Tài khoản đã bị khóa"
+                )
             }
-        } catch (e: Exception) {
-            LocalDate.now().toString()
-        }
-    }
-}
 
-object ManagerService {
-    fun getStaff(): List<StaffDto> {
-        return Db.query(
-            """
-            SELECT u.id, u.full_name, u.email, u.role, u.branch_id, u.position,
-                   b.name AS branch_name,
-                   ps.position_name
-            FROM users u
-            LEFT JOIN branches b ON b.id = u.branch_id
-            LEFT JOIN position_salaries ps ON ps.position = u.position
-            WHERE u.role = 'STAFF'
-            ORDER BY u.id
-            """.trimIndent()
-        ) { rs ->
-            StaffDto(
-                id = rs.getInt("id"),
-                fullName = rs.getString("full_name"),
-                email = rs.getString("email"),
-                role = rs.getString("role"),
-                branchId = rs.getInt("branch_id"),
-                position = rs.getString("position"),
-                positionName = rs.getString("position_name") ?: "Phục vụ",
-                branchName = rs.getString("branch_name") ?: "Chi nhánh chính"
-            )
-        }
-    }
-
-    fun createStaff(body: CreateStaffRequest): ApiMessage {
-        val position = body.position.ifBlank { "SERVER" }
-        val branchId = body.branchId ?: 1
-
-        Db.insert(
-            """
-            INSERT INTO users (full_name, email, password, role, position, branch_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """.trimIndent(),
-            body.fullName,
-            body.email,
-            body.password,
-            body.role.ifBlank { "STAFF" },
-            position,
-            branchId
-        )
-
-        return ApiMessage("Tạo nhân viên thành công")
-    }
-}
-
-object AdminService {
-    fun getBranches(): List<BranchDto> {
-        return Db.query(
-            """
-            SELECT id, name, address, wifi_bssid, reward_rate
-            FROM branches
-            ORDER BY id
-            """.trimIndent()
-        ) { rs ->
-            BranchDto(
-                id = rs.getInt("id"),
-                name = rs.getString("name"),
-                address = rs.getString("address"),
-                wifiBssid = rs.getString("wifi_bssid"),
-                rewardRate = rs.getDouble("reward_rate")
-            )
-        }
-    }
-
-    fun createBranch(body: BranchRequest): ApiMessage {
-        Db.insert(
-            """
-            INSERT INTO branches (name, address, wifi_bssid, reward_rate)
-            VALUES (?, ?, ?, ?)
-            """.trimIndent(),
-            body.name,
-            body.address,
-            body.wifiBssid,
-            body.rewardRate ?: 1.0
-        )
-
-        return ApiMessage("Tạo chi nhánh thành công")
-    }
-
-    fun updateBranch(id: Int, body: BranchRequest): ApiMessage {
-        Db.update(
-            """
-            UPDATE branches
-            SET name = ?, address = ?, wifi_bssid = ?, reward_rate = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """.trimIndent(),
-            body.name,
-            body.address,
-            body.wifiBssid,
-            body.rewardRate ?: 1.0,
-            id
-        )
-
-        return ApiMessage("Cập nhật chi nhánh thành công")
-    }
-
-    fun getPositionSalaries(): List<PositionSalaryDto> {
-        return Db.query(
-            """
-            SELECT position, position_name, hourly_rate
-            FROM position_salaries
-            ORDER BY id
-            """.trimIndent()
-        ) { rs ->
-            PositionSalaryDto(
-                position = rs.getString("position"),
-                positionName = rs.getString("position_name"),
-                hourlyRate = rs.getDouble("hourly_rate")
-            )
-        }
-    }
-
-    fun updatePositionSalary(position: String, body: UpdatePositionSalaryRequest): ApiMessage {
-        Db.update(
-            """
-            UPDATE position_salaries
-            SET hourly_rate = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE position = ?
-            """.trimIndent(),
-            body.hourlyRate,
-            position
-        )
-
-        return ApiMessage("Cập nhật lương chức vụ thành công")
-    }
-
-    fun getSalaryReport(): List<SalaryDto> {
-        return Db.query(
-            """
-            SELECT u.id AS user_id, u.full_name, u.position,
-                   COALESCE(ps.position_name, u.position) AS position_name,
-                   COALESCE(ps.hourly_rate, 0) AS hourly_rate,
-                   COALESCE(SUM(a.total_hours), 0) AS total_hours,
-                   COALESCE(SUM(a.late_minutes), 0) AS late_minutes,
-                   COALESCE(SUM(a.overtime_minutes), 0) AS overtime_minutes
-            FROM users u
-            LEFT JOIN attendance_logs a ON a.user_id = u.id
-            LEFT JOIN position_salaries ps ON ps.position = u.position
-            WHERE u.role = 'STAFF'
-            GROUP BY u.id, u.full_name, u.position, ps.position_name, ps.hourly_rate
-            ORDER BY u.id
-            """.trimIndent()
-        ) { rs ->
-            val totalHours = rs.getDouble("total_hours")
-            val hourlyRate = rs.getDouble("hourly_rate")
-
-            SalaryDto(
-                userId = rs.getInt("user_id"),
-                fullName = rs.getString("full_name"),
-                totalHours = totalHours,
-                salary = totalHours * hourlyRate,
-                position = rs.getString("position"),
-                positionName = rs.getString("position_name"),
-                hourlyRate = hourlyRate,
-                lateMinutes = rs.getInt("late_minutes"),
-                overtimeMinutes = rs.getInt("overtime_minutes")
-            )
-        }
-    }
-}
-
-object ScheduleService {
-    fun getMockSchedules(): List<ScheduleItem> {
-        return listOf(
-            ScheduleItem(
-                date = LocalDate.now().toString(),
-                shift = "Ca sáng",
-                startTime = "08:00",
-                endTime = "12:00",
-                note = "Làm đúng giờ"
-            ),
-            ScheduleItem(
-                date = LocalDate.now().plusDays(1).toString(),
-                shift = "Ca chiều",
-                startTime = "13:00",
-                endTime = "17:00",
-                note = "Có thể đổi ca nếu cần"
-            )
-        )
-    }
-
-    fun createOneSchedule(body: CreateScheduleRequest): ApiMessage {
-        val shift = getShift(body.shiftId)
-        val user = getUserPositionAndBranch(body.userId)
-
-        Db.insert(
-            """
-            INSERT INTO schedules (user_id, shift_id, branch_id, work_date, position, start_time, end_time)
-            VALUES (?, ?, ?, ?::date, ?, ?, ?)
-            """.trimIndent(),
-            body.userId,
-            body.shiftId,
-            user.branchId,
-            body.workDate,
-            user.position,
-            shift.startTime,
-            shift.endTime
-        )
-
-        return ApiMessage("Tạo lịch làm thành công")
-    }
-
-    fun createMultiSchedule(body: CreateMultiScheduleRequest): ApiMessage {
-        if (body.userIds.size < 2) {
-            return ApiMessage("Một ca làm cần ít nhất 2 nhân viên")
-        }
-
-        val staff = body.userIds.map { getUserPositionAndBranch(it) }
-        val hasServer = staff.any { it.position == "SERVER" }
-        val hasBarista = staff.any { it.position == "BARISTA" }
-
-        if (!hasServer || !hasBarista) {
-            return ApiMessage("Ca làm cần ít nhất 1 Phục vụ và 1 Pha chế")
-        }
-
-        val shift = getShift(body.shiftId)
-
-        body.userIds.forEach { userId ->
-            val user = getUserPositionAndBranch(userId)
-
-            Db.insert(
+            /*
+                Bản dev: không khóa tài khoản khi đổi thiết bị.
+                Vì bạn đang test bằng curl + emulator nên nếu khóa device sẽ rất dễ lỗi 423.
+                Khi app ổn định rồi mới bật lại chống gian lận device.
+            */
+            conn.prepareStatement(
                 """
-                INSERT INTO schedules (user_id, shift_id, branch_id, work_date, position, start_time, end_time)
-                VALUES (?, ?, ?, ?::date, ?, ?, ?)
-                """.trimIndent(),
-                userId,
-                body.shiftId,
-                user.branchId,
-                body.workDate,
-                user.position,
-                shift.startTime,
-                shift.endTime
+            UPDATE users
+            SET device_id = ?, fcm_token = ?, active = TRUE
+            WHERE id = ?
+            """.trimIndent()
+            ).use { ps ->
+                ps.setString(1, body.androidId.ifBlank { body.deviceId.ifBlank { body.android_id } })
+                ps.setString(2, body.fcmToken)
+                ps.setInt(3, user.id)
+                ps.executeUpdate()
+            }
+
+            val token = UUID.randomUUID().toString()
+
+            conn.prepareStatement(
+                """
+            INSERT INTO sessions(token, user_id)
+            VALUES (?, ?)
+            """.trimIndent()
+            ).use { ps ->
+                ps.setString(1, token)
+                ps.setInt(2, user.id)
+                ps.executeUpdate()
+            }
+
+            val safeUser = AuthUser(
+                id = user.id,
+                fullName = user.fullName,
+                email = user.email,
+                role = user.role,
+                branchId = user.branchId,
+                position = user.position
+            )
+
+            LoginResult.Success(
+                LoginResponse(
+                    success = true,
+                    message = "Đăng nhập thành công",
+                    token = token,
+                    user = safeUser
+                )
             )
         }
-
-        return ApiMessage("Tạo lịch làm thành công")
     }
 
-    private fun getShift(id: Int): ShiftData {
-        val shifts = Db.query(
-            "SELECT id, name, start_time, end_time FROM shifts WHERE id = ? LIMIT 1",
-            id
-        ) { rs ->
-            ShiftData(
-                id = rs.getInt("id"),
-                name = rs.getString("name"),
-                startTime = rs.getString("start_time"),
-                endTime = rs.getString("end_time")
-            )
+    fun findUserByToken(token: String): AuthUser? {
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                SELECT u.id, u.full_name, u.email, u.role, u.branch_id, u.position
+                FROM sessions s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.token = ?
+                  AND s.expires_at > NOW()
+                  AND u.active = TRUE
+                """.trimIndent()
+            ).use { ps ->
+                ps.setString(1, token)
+                ps.executeQuery().use { rs ->
+                    if (rs.next()) rs.toAuthUser() else null
+                }
+            }
+        }
+    }
+
+    fun checkDeviceAndWifi(user: AuthUser, deviceId: String, currentBssid: String): CheckResult {
+        if (deviceId.isBlank()) {
+            return CheckResult(false, "Không đọc được Android ID")
         }
 
-        return shifts.firstOrNull()
-            ?: ShiftData(id = 1, name = "Ca sáng", startTime = "08:00", endTime = "12:00")
-    }
-
-    private fun getUserPositionAndBranch(userId: Int): UserMini {
-        val users = Db.query(
-            "SELECT id, position, COALESCE(branch_id, 1) AS branch_id FROM users WHERE id = ? LIMIT 1",
-            userId
-        ) { rs ->
-            UserMini(
-                id = rs.getInt("id"),
-                position = rs.getString("position"),
-                branchId = rs.getInt("branch_id")
-            )
+        if (currentBssid.isBlank() || currentBssid == "02:00:00:00:00:00") {
+            return CheckResult(false, "Không đọc được BSSID Wi-Fi. Hãy bật Wi-Fi, GPS và cấp quyền vị trí")
         }
 
-        return users.firstOrNull() ?: UserMini(userId, "SERVER", 1)
+        if (user.branchId == null) {
+            return CheckResult(false, "Tài khoản chưa được gán chi nhánh")
+        }
+
+        return useConnection { conn ->
+            val dbDeviceId = conn.prepareStatement("SELECT device_id FROM users WHERE id = ?").use { ps ->
+                ps.setInt(1, user.id)
+                ps.executeQuery().use { rs ->
+                    if (rs.next()) rs.getString("device_id") else null
+                }
+            }
+
+            if (dbDeviceId != deviceId) {
+                conn.prepareStatement("UPDATE users SET active = FALSE WHERE id = ?").use { ps ->
+                    ps.setInt(1, user.id)
+                    ps.executeUpdate()
+                }
+                return@useConnection CheckResult(false, "Sai thiết bị. Tài khoản đã bị khóa")
+            }
+
+            val branchBssid = conn.prepareStatement("SELECT wifi_bssid FROM branches WHERE id = ?").use { ps ->
+                ps.setInt(1, user.branchId)
+                ps.executeQuery().use { rs ->
+                    if (rs.next()) rs.getString("wifi_bssid") else null
+                }
+            }
+
+            if (normalizeBssid(branchBssid) != normalizeBssid(currentBssid)) {
+                return@useConnection CheckResult(false, "Sai Wi-Fi chi nhánh")
+            }
+
+            CheckResult(true, "OK")
+        }
     }
-}
 
-object AttendanceService {
-    fun checkIn(body: CheckInRequest): CheckInResponse {
-        val userId = 3
+    fun checkIn(userId: Int): ActionResult {
+        return useConnection { conn ->
+            val hasOpen = conn.prepareStatement(
+                """
+                SELECT id FROM attendances
+                WHERE user_id = ?
+                  AND check_out_time IS NULL
+                ORDER BY id DESC
+                LIMIT 1
+                """.trimIndent()
+            ).use { ps ->
+                ps.setInt(1, userId)
+                ps.executeQuery().use { it.next() }
+            }
 
-        Db.insert(
-            """
-            INSERT INTO attendance_logs (user_id, branch_id, check_in_time, check_in_bssid, status)
-            VALUES (?, 1, CURRENT_TIMESTAMP, ?, 'VALID')
-            """.trimIndent(),
-            userId,
-            body.bssid
-        )
+            if (hasOpen) {
+                return@useConnection ActionResult(false, HttpStatusCode.Conflict, "Bạn đã chấm công vào, chưa chấm công ra")
+            }
 
-        return CheckInResponse(success = true, message = "Vào ca thành công")
+            conn.prepareStatement(
+                """
+                INSERT INTO attendances(user_id, check_in_time, status)
+                VALUES (?, NOW(), 'VALID')
+                """.trimIndent()
+            ).use { ps ->
+                ps.setInt(1, userId)
+                ps.executeUpdate()
+            }
+
+            ActionResult(true, HttpStatusCode.OK, "Chấm công vào thành công")
+        }
     }
 
-    fun checkOut(body: CheckOutRequest): CheckOutResponse {
-        val userId = 3
+    fun checkOut(userId: Int): ActionResult {
+        return useConnection { conn ->
+            val openId = conn.prepareStatement(
+                """
+                SELECT id FROM attendances
+                WHERE user_id = ?
+                  AND check_out_time IS NULL
+                ORDER BY id DESC
+                LIMIT 1
+                """.trimIndent()
+            ).use { ps ->
+                ps.setInt(1, userId)
+                ps.executeQuery().use { rs ->
+                    if (rs.next()) rs.getInt("id") else null
+                }
+            } ?: return@useConnection ActionResult(false, HttpStatusCode.Conflict, "Bạn chưa chấm công vào")
 
-        Db.update(
-            """
-            UPDATE attendance_logs
-            SET check_out_time = CURRENT_TIMESTAMP,
-                check_out_bssid = ?,
-                total_hours = 4,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = (
-                SELECT id FROM attendance_logs
+            conn.prepareStatement(
+                """
+                UPDATE attendances
+                SET check_out_time = NOW(), updated_at = NOW()
+                WHERE id = ?
+                """.trimIndent()
+            ).use { ps ->
+                ps.setInt(1, openId)
+                ps.executeUpdate()
+            }
+
+            ActionResult(true, HttpStatusCode.OK, "Chấm công ra thành công")
+        }
+    }
+
+    fun getAttendanceStatus(userId: Int): AttendanceStatusResponse {
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                SELECT id, check_in_time::TEXT AS check_in_time, check_out_time::TEXT AS check_out_time, status
+                FROM attendances
                 WHERE user_id = ?
                 ORDER BY id DESC
                 LIMIT 1
-            )
-            """.trimIndent(),
-            body.bssid,
-            userId
-        )
-
-        return CheckOutResponse(success = true, message = "Ra ca thành công")
+                """.trimIndent()
+            ).use { ps ->
+                ps.setInt(1, userId)
+                ps.executeQuery().use { rs ->
+                    if (rs.next()) {
+                        AttendanceStatusResponse(
+                            checkedIn = rs.getString("check_out_time") == null,
+                            checkInTime = rs.getString("check_in_time"),
+                            checkOutTime = rs.getString("check_out_time"),
+                            status = rs.getString("status")
+                        )
+                    } else {
+                        AttendanceStatusResponse(false, null, null, "NO_ATTENDANCE")
+                    }
+                }
+            }
+        }
     }
 
-    fun getManagerAttendance(): List<AttendanceDto> {
-        return Db.query(
-            """
-            SELECT a.id, a.user_id, u.full_name, a.check_in_time, a.check_out_time,
-                   a.status, a.check_in_bssid, a.check_out_bssid,
-                   u.position, COALESCE(ps.position_name, u.position) AS position_name,
-                   a.late_minutes, a.overtime_minutes, a.total_hours
-            FROM attendance_logs a
-            JOIN users u ON u.id = a.user_id
-            LEFT JOIN position_salaries ps ON ps.position = u.position
-            ORDER BY a.id DESC
-            """.trimIndent()
-        ) { rs ->
-            AttendanceDto(
-                id = rs.getInt("id"),
-                userId = rs.getInt("user_id"),
-                fullName = rs.getString("full_name"),
-                checkInTime = rs.getTimestamp("check_in_time")?.toString(),
-                checkOutTime = rs.getTimestamp("check_out_time")?.toString(),
-                status = rs.getString("status"),
-                checkInBssid = rs.getString("check_in_bssid"),
-                checkOutBssid = rs.getString("check_out_bssid"),
-                position = rs.getString("position"),
-                positionName = rs.getString("position_name"),
-                lateMinutes = rs.getInt("late_minutes"),
-                overtimeMinutes = rs.getInt("overtime_minutes"),
-                totalHours = rs.getDouble("total_hours")
-            )
+    fun getBranches(): List<BranchDto> {
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                SELECT id, name, address, wifi_bssid, reward_rate
+                FROM branches
+                ORDER BY id
+                """.trimIndent()
+            ).use { ps ->
+                ps.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(
+                                BranchDto(
+                                    id = rs.getInt("id"),
+                                    name = rs.getString("name"),
+                                    address = rs.getString("address"),
+                                    wifiBssid = rs.getString("wifi_bssid"),
+                                    rewardRate = rs.getDouble("reward_rate")
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun createBranch(body: BranchRequest): BranchDto {
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                INSERT INTO branches(name, address, wifi_bssid, reward_rate)
+                VALUES (?, ?, ?, ?)
+                RETURNING id, name, address, wifi_bssid, reward_rate
+                """.trimIndent()
+            ).use { ps ->
+                ps.setString(1, body.name)
+                ps.setString(2, body.address)
+                ps.setString(3, body.wifiBssid)
+                ps.setDouble(4, body.rewardRate)
+                ps.executeQuery().use { rs ->
+                    rs.next()
+                    BranchDto(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("address"),
+                        rs.getString("wifi_bssid"),
+                        rs.getDouble("reward_rate")
+                    )
+                }
+            }
+        }
+    }
+
+    fun updateBranch(id: Int, body: BranchRequest): BranchDto {
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                UPDATE branches
+                SET name = ?, address = ?, wifi_bssid = ?, reward_rate = ?
+                WHERE id = ?
+                RETURNING id, name, address, wifi_bssid, reward_rate
+                """.trimIndent()
+            ).use { ps ->
+                ps.setString(1, body.name)
+                ps.setString(2, body.address)
+                ps.setString(3, body.wifiBssid)
+                ps.setDouble(4, body.rewardRate)
+                ps.setInt(5, id)
+                ps.executeQuery().use { rs ->
+                    rs.next()
+                    BranchDto(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("address"),
+                        rs.getString("wifi_bssid"),
+                        rs.getDouble("reward_rate")
+                    )
+                }
+            }
+        }
+    }
+
+    fun getShifts(): List<ShiftDto> {
+        return useConnection { conn ->
+            conn.prepareStatement("SELECT id, name, start_time, end_time FROM shifts ORDER BY id").use { ps ->
+                ps.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(
+                                ShiftDto(
+                                    rs.getInt("id"),
+                                    rs.getString("name"),
+                                    rs.getString("start_time"),
+                                    rs.getString("end_time")
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun createShift(body: ShiftRequest): ShiftDto {
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                INSERT INTO shifts(name, start_time, end_time)
+                VALUES (?, ?, ?)
+                RETURNING id, name, start_time, end_time
+                """.trimIndent()
+            ).use { ps ->
+                ps.setString(1, body.name)
+                ps.setString(2, body.startTime)
+                ps.setString(3, body.endTime)
+                ps.executeQuery().use { rs ->
+                    rs.next()
+                    ShiftDto(
+                        rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("start_time"),
+                        rs.getString("end_time")
+                    )
+                }
+            }
+        }
+    }
+
+    fun getStaff(currentUser: AuthUser): List<StaffDto> {
+        return useConnection { conn ->
+            val sql = if (currentUser.role == "ADMIN") {
+                """
+                SELECT u.id, u.full_name, u.email, u.role, u.branch_id, u.position, b.name AS branch_name
+                FROM users u
+                LEFT JOIN branches b ON b.id = u.branch_id
+                WHERE u.role IN ('STAFF', 'MANAGER')
+                ORDER BY u.id
+                """.trimIndent()
+            } else {
+                """
+                SELECT u.id, u.full_name, u.email, u.role, u.branch_id, u.position, b.name AS branch_name
+                FROM users u
+                LEFT JOIN branches b ON b.id = u.branch_id
+                WHERE u.branch_id = ?
+                ORDER BY u.id
+                """.trimIndent()
+            }
+
+            conn.prepareStatement(sql).use { ps ->
+                if (currentUser.role != "ADMIN") ps.setInt(1, currentUser.branchId ?: -1)
+
+                ps.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(
+                                StaffDto(
+                                    id = rs.getInt("id"),
+                                    fullName = rs.getString("full_name"),
+                                    email = rs.getString("email"),
+                                    role = rs.getString("role"),
+                                    branchId = rs.getIntOrNull("branch_id"),
+                                    position = rs.getString("position") ?: "",
+                                    positionName = positionName(rs.getString("position") ?: ""),
+                                    branchName = rs.getString("branch_name") ?: ""
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun createStaff(currentUser: AuthUser, body: CreateStaffRequest): StaffDto {
+        val branchId = if (currentUser.role == "ADMIN") body.branchId else currentUser.branchId
+
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                INSERT INTO users(full_name, email, password_hash, role, branch_id, position, base_salary)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                RETURNING id, full_name, email, role, branch_id, position
+                """.trimIndent()
+            ).use { ps ->
+                ps.setString(1, body.fullName)
+                ps.setString(2, body.email)
+                ps.setString(3, body.password)
+                ps.setString(4, body.role.ifBlank { "STAFF" })
+                if (branchId == null) ps.setNull(5, java.sql.Types.INTEGER) else ps.setInt(5, branchId)
+                ps.setString(6, body.position)
+                ps.setDouble(7, body.baseSalary)
+                ps.executeQuery().use { rs ->
+                    rs.next()
+                    StaffDto(
+                        id = rs.getInt("id"),
+                        fullName = rs.getString("full_name"),
+                        email = rs.getString("email"),
+                        role = rs.getString("role"),
+                        branchId = rs.getIntOrNull("branch_id"),
+                        position = rs.getString("position") ?: "",
+                        positionName = positionName(rs.getString("position") ?: ""),
+                        branchName = ""
+                    )
+                }
+            }
+        }
+    }
+
+    fun getMySchedules(userId: Int): List<ScheduleDto> {
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                SELECT s.id, s.user_id, u.full_name, s.shift_id, sh.name AS shift_name, 
+                       sh.start_time, sh.end_time, s.work_date::TEXT AS work_date, s.status
+                FROM schedules s
+                JOIN users u ON u.id = s.user_id
+                JOIN shifts sh ON sh.id = s.shift_id
+                WHERE s.user_id = ?
+                ORDER BY s.work_date DESC, s.id DESC
+                """.trimIndent()
+            ).use { ps ->
+                ps.setInt(1, userId)
+                ps.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) add(rs.toScheduleDto())
+                    }
+                }
+            }
+        }
+    }
+
+    fun createSchedules(currentUser: AuthUser, body: CreateMultiScheduleRequest): MessageResponse {
+        if (body.items.isEmpty()) {
+            return MessageResponse(false, "Danh sách lịch trống")
+        }
+
+        return useConnection { conn ->
+            body.items.forEach { item ->
+                if (item.workDate.isBlank()) return@forEach
+
+                conn.prepareStatement(
+                    """
+                    INSERT INTO schedules(user_id, shift_id, work_date, created_by, status)
+                    VALUES (?, ?, ?, ?, 'APPROVED')
+                    ON CONFLICT(user_id, shift_id, work_date)
+                    DO UPDATE SET shift_id = EXCLUDED.shift_id, created_by = EXCLUDED.created_by
+                    """.trimIndent()
+                ).use { ps ->
+                    ps.setInt(1, item.userId)
+                    ps.setInt(2, item.shiftId)
+                    ps.setObject(3, LocalDate.parse(item.workDate))
+                    ps.setInt(4, currentUser.id)
+                    ps.executeUpdate()
+                }
+            }
+
+            MessageResponse(true, "Đã tạo lịch làm")
+        }
+    }
+
+    fun getRequests(currentUser: AuthUser): List<RequestDto> {
+        return useConnection { conn ->
+            val sql = when (currentUser.role) {
+                "ADMIN" -> """
+                    SELECT r.id, r.user_id, u.full_name, r.type, r.reason, r.status, r.created_at::TEXT AS created_at
+                    FROM requests r
+                    JOIN users u ON u.id = r.user_id
+                    ORDER BY r.id DESC
+                """.trimIndent()
+
+                "MANAGER" -> """
+                    SELECT r.id, r.user_id, u.full_name, r.type, r.reason, r.status, r.created_at::TEXT AS created_at
+                    FROM requests r
+                    JOIN users u ON u.id = r.user_id
+                    WHERE u.branch_id = ?
+                    ORDER BY r.id DESC
+                """.trimIndent()
+
+                else -> """
+                    SELECT r.id, r.user_id, u.full_name, r.type, r.reason, r.status, r.created_at::TEXT AS created_at
+                    FROM requests r
+                    JOIN users u ON u.id = r.user_id
+                    WHERE r.user_id = ?
+                    ORDER BY r.id DESC
+                """.trimIndent()
+            }
+
+            conn.prepareStatement(sql).use { ps ->
+                when (currentUser.role) {
+                    "MANAGER" -> ps.setInt(1, currentUser.branchId ?: -1)
+                    "STAFF" -> ps.setInt(1, currentUser.id)
+                }
+
+                ps.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(
+                                RequestDto(
+                                    id = rs.getInt("id"),
+                                    userId = rs.getInt("user_id"),
+                                    fullName = rs.getString("full_name"),
+                                    type = rs.getString("type"),
+                                    reason = rs.getString("reason"),
+                                    status = rs.getString("status"),
+                                    createdAt = rs.getString("created_at")
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun createRequest(currentUser: AuthUser, body: CreateRequestBody): MessageResponse {
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                INSERT INTO requests(user_id, type, reason, status)
+                VALUES (?, ?, ?, 'PENDING')
+                """.trimIndent()
+            ).use { ps ->
+                ps.setInt(1, currentUser.id)
+                ps.setString(2, body.type)
+                ps.setString(3, body.reason)
+                ps.executeUpdate()
+            }
+
+            MessageResponse(true, "Đã gửi yêu cầu")
+        }
+    }
+
+    fun updateRequestStatus(currentUser: AuthUser, requestId: Int, status: String): MessageResponse {
+        return useConnection { conn ->
+            conn.prepareStatement(
+                """
+                UPDATE requests
+                SET status = ?, manager_id = ?, updated_at = NOW()
+                WHERE id = ?
+                """.trimIndent()
+            ).use { ps ->
+                ps.setString(1, status)
+                ps.setInt(2, currentUser.id)
+                ps.setInt(3, requestId)
+                val count = ps.executeUpdate()
+
+                if (count > 0) {
+                    MessageResponse(true, "Đã cập nhật yêu cầu")
+                } else {
+                    MessageResponse(false, "Không tìm thấy yêu cầu")
+                }
+            }
+        }
+    }
+
+    fun getSalaryReport(currentUser: AuthUser): List<SalaryDto> {
+        return useConnection { conn ->
+            val sql = if (currentUser.role == "ADMIN") {
+                """
+                SELECT u.id AS user_id, u.full_name, COUNT(a.id) AS attendance_count, u.base_salary
+                FROM users u
+                LEFT JOIN attendances a ON a.user_id = u.id
+                WHERE u.role = 'STAFF'
+                GROUP BY u.id, u.full_name, u.base_salary
+                ORDER BY u.id
+                """.trimIndent()
+            } else {
+                """
+                SELECT u.id AS user_id, u.full_name, COUNT(a.id) AS attendance_count, u.base_salary
+                FROM users u
+                LEFT JOIN attendances a ON a.user_id = u.id
+                WHERE u.role = 'STAFF' AND u.branch_id = ?
+                GROUP BY u.id, u.full_name, u.base_salary
+                ORDER BY u.id
+                """.trimIndent()
+            }
+
+            conn.prepareStatement(sql).use { ps ->
+                if (currentUser.role != "ADMIN") ps.setInt(1, currentUser.branchId ?: -1)
+
+                ps.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            val baseSalary = rs.getDouble("base_salary")
+                            val attendanceCount = rs.getInt("attendance_count")
+                            add(
+                                SalaryDto(
+                                    userId = rs.getInt("user_id"),
+                                    fullName = rs.getString("full_name"),
+                                    attendanceCount = attendanceCount,
+                                    estimatedSalary = baseSalary / 26.0 * attendanceCount
+                                )
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-// ================= DATA CLASSES =================
+private suspend fun ApplicationCall.requireUser(vararg roles: String): AuthUser? {
+    val header = request.headers[HttpHeaders.Authorization].orEmpty()
+    val token = header.removePrefix("Bearer").trim()
 
-data class ApiMessage(
-    val message: String? = null
+    if (token.isBlank()) {
+        respond(HttpStatusCode.Unauthorized, MessageResponse(false, "Thiếu token"))
+        return null
+    }
+
+    val user = Db.findUserByToken(token)
+    if (user == null) {
+        respond(HttpStatusCode.Unauthorized, MessageResponse(false, "Token không hợp lệ hoặc đã hết hạn"))
+        return null
+    }
+
+    if (roles.isNotEmpty() && user.role !in roles) {
+        respond(HttpStatusCode.Forbidden, MessageResponse(false, "Không có quyền truy cập"))
+        return null
+    }
+
+    return user
+}
+
+private suspend fun ApplicationCall.verifyDeviceAndWifi(
+    user: AuthUser,
+    deviceId: String,
+    currentBssid: String
+): Boolean {
+    val result = Db.checkDeviceAndWifi(user, deviceId, currentBssid)
+    if (!result.success) {
+        respond(HttpStatusCode.Forbidden, MessageResponse(false, result.message))
+        return false
+    }
+    return true
+}
+
+private fun Connection.exec(sql: String) {
+    createStatement().use { it.execute(sql) }
+}
+
+private fun ResultSet.getIntOrNull(column: String): Int? {
+    val value = getInt(column)
+    return if (wasNull()) null else value
+}
+
+private fun ResultSet.toAuthUser(): AuthUser {
+    return AuthUser(
+        id = getInt("id"),
+        fullName = getString("full_name"),
+        email = getString("email"),
+        role = getString("role"),
+        branchId = getIntOrNull("branch_id"),
+        position = getString("position")
+    )
+}
+
+private fun ResultSet.toAuthUserWithDevice(): AuthUserWithDevice {
+    return AuthUserWithDevice(
+        id = getInt("id"),
+        fullName = getString("full_name"),
+        email = getString("email"),
+        role = getString("role"),
+        branchId = getIntOrNull("branch_id"),
+        position = getString("position"),
+        deviceId = getString("device_id"),
+        active = getBoolean("active")
+    )
+}
+
+private fun ResultSet.toScheduleDto(): ScheduleDto {
+    return ScheduleDto(
+        id = getInt("id"),
+        userId = getInt("user_id"),
+        fullName = getString("full_name"),
+        shiftId = getInt("shift_id"),
+        shiftName = getString("shift_name"),
+        startTime = getString("start_time"),
+        endTime = getString("end_time"),
+        workDate = getString("work_date"),
+        status = getString("status")
+    )
+}
+
+private fun normalizeBssid(value: String?): String {
+    return value.orEmpty().trim().uppercase()
+}
+
+private fun positionName(position: String): String {
+    return when (position.uppercase()) {
+        "SERVER" -> "Phục vụ"
+        "BARISTA" -> "Pha chế"
+        "KITCHEN" -> "Bếp"
+        "CASHIER" -> "Thu ngân"
+        "MANAGER" -> "Quản lý"
+        else -> position
+    }
+}
+
+sealed class LoginResult {
+    data class Success(val response: LoginResponse) : LoginResult()
+    data class Fail(val status: HttpStatusCode, val message: String) : LoginResult()
+}
+
+data class ActionResult(
+    val success: Boolean,
+    val status: HttpStatusCode,
+    val message: String
 )
 
+data class CheckResult(
+    val success: Boolean,
+    val message: String
+)
+
+@Serializable
+data class MessageResponse(
+    val success: Boolean,
+    val message: String
+)
+
+@Serializable
 data class LoginRequest(
-    val username: String,
-    val password: String
+    val email: String = "",
+    val password: String = "",
+    val androidId: String = "",
+    val deviceId: String = "",
+    val android_id: String = "",
+    val fcmToken: String? = null
 )
 
+@Serializable
 data class LoginResponse(
     val success: Boolean,
     val message: String,
-    val token: String?,
-    val user: LoginUser? = null
+    val token: String,
+    val user: AuthUser
 )
 
-data class LoginUser(
+@Serializable
+data class AuthUser(
     val id: Int,
     val fullName: String,
     val email: String,
     val role: String,
-    val position: String?,
-    val branchId: Int?
+    val branchId: Int? = null,
+    val position: String? = null
 )
 
-data class OldLeaveRequest(
-    val androidId: String? = null,
-    val type: String,
-    val date: String,
-    val reason: String,
-    val timestamp: Long? = null
-)
-
-data class OldLeaveResponse(
-    val success: Boolean,
-    val message: String
-)
-
-data class StaffCreateRequest(
-    val type: String,
-    val reason: String,
-    val targetDate: String
-)
-
-data class StaffCreateRequestResponse(
-    val success: Boolean,
-    val message: String
-)
-
-data class StaffRequestItem(
-    val id: String,
-    val type: String,
-    val date: String,
-    val reason: String,
-    val status: String,
-    val timestamp: Long
-)
-
-data class StaffRequestsResponse(
-    val success: Boolean,
-    val requests: List<StaffRequestItem>
-)
-
-data class CheckInRequest(
-    val androidId: String? = null,
-    val bssid: String,
-    val timestamp: Long? = null
-)
-
-data class CheckInResponse(
-    val success: Boolean,
-    val message: String
-)
-
-data class CheckOutRequest(
-    val androidId: String? = null,
-    val bssid: String,
-    val timestamp: Long? = null
-)
-
-data class CheckOutResponse(
-    val success: Boolean,
-    val message: String
-)
-
-data class AttendanceStatusResponse(
-    val success: Boolean,
-    val status: String,
-    val checkInTime: String?,
-    val checkOutTime: String?
-)
-
-data class ScheduleItem(
-    val date: String,
-    val shift: String,
-    val startTime: String,
-    val endTime: String,
-    val note: String?
-)
-
-data class ScheduleResponse(
-    val success: Boolean,
-    val schedules: List<ScheduleItem>
-)
-
-data class StaffDto(
+data class AuthUserWithDevice(
     val id: Int,
     val fullName: String,
     val email: String,
     val role: String,
     val branchId: Int?,
-    val position: String = "SERVER",
-    val positionName: String = "Phục vụ",
-    val branchName: String = "Chi nhánh chính"
+    val position: String?,
+    val deviceId: String?,
+    val active: Boolean
 )
 
-data class RequestDto(
-    val id: Int,
-    val userId: Int,
-    val fullName: String?,
-    val type: String,
-    val reason: String,
-    val targetDate: String,
+@Serializable
+data class AttendanceRequest(
+    val deviceId: String,
+    val currentBssid: String
+)
+
+@Serializable
+data class AttendanceStatusResponse(
+    val checkedIn: Boolean,
+    val checkInTime: String?,
+    val checkOutTime: String?,
     val status: String
 )
 
-data class AttendanceDto(
-    val id: Int,
-    val userId: Int,
-    val fullName: String?,
-    val checkInTime: String?,
-    val checkOutTime: String?,
-    val status: String,
-    val checkInBssid: String?,
-    val checkOutBssid: String?,
-    val position: String = "SERVER",
-    val positionName: String = "Phục vụ",
-    val lateMinutes: Int = 0,
-    val overtimeMinutes: Int = 0,
-    val totalHours: Double = 0.0
-)
-
+@Serializable
 data class BranchDto(
     val id: Int,
     val name: String,
     val address: String,
     val wifiBssid: String,
-    val rewardRate: Double?
+    val rewardRate: Double = 1.0
 )
 
+@Serializable
 data class BranchRequest(
     val name: String,
     val address: String,
     val wifiBssid: String,
-    val rewardRate: Double?
+    val rewardRate: Double = 1.0
 )
 
-data class SalaryDto(
-    val userId: Int,
-    val fullName: String,
-    val totalHours: Double,
-    val salary: Double,
-    val position: String = "SERVER",
-    val positionName: String = "Phục vụ",
-    val hourlyRate: Double = 0.0,
-    val lateMinutes: Int = 0,
-    val overtimeMinutes: Int = 0
-)
-
-data class CreateStaffRequest(
-    val fullName: String,
-    val email: String,
-    val password: String,
-    val role: String = "STAFF",
-    val position: String,
-    val branchId: Int?
-)
-
-data class CreateScheduleRequest(
-    val userId: Int,
-    val shiftId: Int,
-    val workDate: String
-)
-
-data class CreateMultiScheduleRequest(
-    val userIds: List<Int>,
-    val shiftId: Int,
-    val workDate: String
-)
-
-data class PositionSalaryDto(
-    val position: String,
-    val positionName: String,
-    val hourlyRate: Double
-)
-
-data class UpdatePositionSalaryRequest(
-    val hourlyRate: Double
-)
-
-data class ShiftData(
+@Serializable
+data class ShiftDto(
     val id: Int,
     val name: String,
     val startTime: String,
     val endTime: String
 )
 
-data class UserMini(
+@Serializable
+data class ShiftRequest(
+    val name: String,
+    val startTime: String,
+    val endTime: String
+)
+
+@Serializable
+data class StaffDto(
     val id: Int,
+    val fullName: String,
+    val email: String,
+    val role: String,
+    val branchId: Int?,
     val position: String,
-    val branchId: Int
+    val positionName: String,
+    val branchName: String
+)
+
+@Serializable
+data class CreateStaffRequest(
+    val fullName: String,
+    val email: String,
+    val password: String,
+    val role: String = "STAFF",
+    val branchId: Int? = null,
+    val position: String,
+    val baseSalary: Double = 0.0
+)
+
+@Serializable
+data class ScheduleDto(
+    val id: Int,
+    val userId: Int,
+    val fullName: String,
+    val shiftId: Int,
+    val shiftName: String,
+    val startTime: String,
+    val endTime: String,
+    val workDate: String,
+    val status: String
+)
+
+@Serializable
+data class CreateScheduleRequest(
+    val userId: Int,
+    val shiftId: Int,
+    val workDate: String
+)
+
+@Serializable
+data class CreateMultiScheduleRequest(
+    val items: List<CreateScheduleRequest>
+)
+
+@Serializable
+data class RequestDto(
+    val id: Int,
+    val userId: Int,
+    val fullName: String,
+    val type: String,
+    val reason: String,
+    val status: String,
+    val createdAt: String
+)
+
+@Serializable
+data class CreateRequestBody(
+    val type: String,
+    val reason: String
+)
+
+@Serializable
+data class SalaryDto(
+    val userId: Int,
+    val fullName: String,
+    val attendanceCount: Int,
+    val estimatedSalary: Double
 )
