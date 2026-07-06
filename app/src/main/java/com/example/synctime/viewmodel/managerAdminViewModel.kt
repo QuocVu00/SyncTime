@@ -28,7 +28,7 @@ class ManagerAdminViewModel(
         true: dùng dữ liệu mẫu để demo UI, chưa cần backend.
         false: gọi API thật.
     */
-    private val useMockData = true
+    private val useMockData = false
 
     private val api = ApiClient.create(token)
 
@@ -465,41 +465,35 @@ class ManagerAdminViewModel(
     }
 
     fun createSchedule(userId: String, shiftId: String, workDate: String) {
-        if (userId.isBlank() || shiftId.isBlank() || workDate.isBlank()) {
-            _message.value = "Vui lòng nhập đủ User ID, Shift ID và ngày làm"
-            return
-        }
-
         val userIdNumber = userId.toIntOrNull()
         val shiftIdNumber = shiftId.toIntOrNull()
 
-        if (userIdNumber == null || shiftIdNumber == null) {
-            _message.value = "User ID và Shift ID phải là số"
-            return
-        }
-
-        if (useMockData) {
-            _message.value = "Đã tạo lịch làm mẫu cho user $userId ngày $workDate"
+        if (userIdNumber == null || shiftIdNumber == null || workDate.isBlank()) {
+            _message.value = "Vui lòng chọn nhân viên, ca làm và ngày làm"
             return
         }
 
         viewModelScope.launch {
             try {
-                val body = CreateScheduleRequest(
-                    userId = userIdNumber,
-                    shiftId = shiftIdNumber,
-                    workDate = workDate
+                val body = CreateMultiScheduleRequest(
+                    items = listOf(
+                        CreateScheduleRequest(
+                            userId = userIdNumber,
+                            shiftId = shiftIdNumber,
+                            workDate = workDate
+                        )
+                    )
                 )
 
-                val response = api.createSchedule(body)
+                val response = api.createMultiSchedule(body)
 
                 if (response.isSuccessful) {
-                    _message.value = "Tạo lịch làm thành công"
+                    _message.value = response.body()?.message ?: "Tạo lịch thành công"
                 } else {
-                    _message.value = "Tạo lịch làm thất bại"
+                    _message.value = "Tạo lịch thất bại. Mã lỗi: ${response.code()}"
                 }
             } catch (e: Exception) {
-                _message.value = "Lỗi: ${e.message}"
+                _message.value = "Lỗi tạo lịch: ${e.message}"
             }
         }
     }
@@ -767,8 +761,8 @@ class ManagerAdminViewModel(
                 )
 
                 val response = api.updatePositionSalary(
-                    position = position,
-                    body = body
+                    position,
+                    body
                 )
 
                 if (response.isSuccessful) {

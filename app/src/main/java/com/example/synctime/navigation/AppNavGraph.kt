@@ -145,7 +145,6 @@ fun AppNavGraph(
         composable("salary_setting") {
             SalarySettingScreen(
                 navController = navController,
-                viewModel = viewModel
             )
         }
 

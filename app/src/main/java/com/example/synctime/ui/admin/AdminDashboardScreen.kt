@@ -1,5 +1,6 @@
 package com.example.synctime.ui.admin
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -10,19 +11,23 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.synctime.LoginActivity
 import com.example.synctime.ui.components.AppCard
 import com.example.synctime.ui.components.AppHeader
-import com.example.synctime.ui.components.AppScreen
 import com.example.synctime.ui.components.MenuActionCard
+import com.example.synctime.ui.components.AppScreen
+import com.example.synctime.utils.AuthManager
 
 @Composable
 fun AdminDashboardScreen(navController: NavController) {
+    val context = LocalContext.current
+
     AppScreen {
         Column(
-            modifier = Modifier
-                .fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -76,6 +81,23 @@ fun AdminDashboardScreen(navController: NavController) {
                     tag = "Report",
                     onClick = {
                         navController.navigate("salary_report")
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                MenuActionCard(
+                    title = "Đăng xuất",
+                    description = "Thoát tài khoản hiện tại và quay về màn hình đăng nhập",
+                    tag = "Logout",
+                    onClick = {
+                        AuthManager.logout(context)
+
+                        val intent = Intent(context, LoginActivity::class.java)
+                        intent.flags =
+                            Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+
+                        context.startActivity(intent)
                     }
                 )
             }

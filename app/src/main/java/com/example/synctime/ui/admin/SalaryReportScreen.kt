@@ -41,10 +41,8 @@ fun SalaryReportScreen(
     LaunchedEffect(Unit) {
         viewModel.loadSalaryReport()
     }
-
-    val totalSalary = salaryList.sumOf { it.salary }
-    val totalHours = salaryList.sumOf { it.totalHours }
-
+    val totalSalary = salaryList.sumOf { it.salary.toDouble() }
+    val totalHours = salaryList.sumOf { it.totalHours.toDouble() }
     AppScreen {
         TextButton(
             onClick = {

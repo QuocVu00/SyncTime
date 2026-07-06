@@ -1,21 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Quyền Internet gọi API backend -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Quyền lấy thông tin WiFi/BSSID để chấm công -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Quyền vị trí, Android cần quyền này để đọc WiFi/BSSID -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <application
+        android:icon="@drawable/logo_synctime"
+        android:roundIcon="@drawable/logo_synctime"
         android:allowBackup="true"
         android:usesCleartextTraffic="true"
-        android:icon="@mipmap/ic_launcher"
         android:label="SyncTime"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SyncTime">
-        <activity android:name=".CreateRequestActivity" />
-        <activity android:name=".MyScheduleActivity" />
-        <activity android:name=".ViewRequestsActivity" />
+
+        <!-- Màn hình đăng nhập -->
         <activity
-            android:name=".MainActivity"
+            android:name=".LoginActivity"
             android:exported="true">
 
             <intent-filter>
@@ -24,6 +31,64 @@
             </intent-filter>
 
         </activity>
+
+        <!-- Màn hình điều hướng phụ -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false" />
+
+        <!-- Màn hình theo quyền -->
+        <activity
+            android:name=".AdminHomeActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ManagerHomeActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".StaffHomeActivity"
+            android:exported="false" />
+
+        <!-- Màn hình trung gian phân quyền chức năng -->
+        <activity
+            android:name=".RoleFeatureActivity"
+            android:exported="false" />
+
+        <!-- Admin / Manager -->
+        <activity
+            android:name=".ManagerRequestsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ManagerCreateScheduleActivity"
+            android:exported="false" />
+
+        <!-- Staff -->
+        <activity
+            android:name=".MyScheduleActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".StaffMyRequestsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".CreateRequestActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ViewRequestsActivity"
+            android:exported="false" />
+
+        <!-- Màn hình chấm công -->
+        <activity
+            android:name=".AttendanceActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ManagerCreateStaffActivity"
+            android:exported="false" />
 
     </application>
 

@@ -94,8 +94,8 @@ class RequestsAdapter(private var items: List<StaffRequestItem>) : RecyclerView.
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
         val context = holder.itemView.context
-        
-        holder.tvType.text = context.getString(R.string.request_type_label) + " " + 
+
+        holder.tvType.text = context.getString(R.string.request_type_label) + " " +
                 (if (item.type == "Leave") context.getString(R.string.request_type_leave) else context.getString(R.string.request_type_change))
         holder.tvDate.text = context.getString(R.string.schedule_date, item.date)
         holder.tvReason.text = context.getString(R.string.request_reason_hint) + ": " + item.reason
